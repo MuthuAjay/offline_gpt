@@ -70,4 +70,14 @@ body {
 
 .markdown-content blockquote {
   @apply border-l-4 border-gray-300 dark:border-gray-700 pl-4 italic my-2;
+}
+
+/* Sidebar styles */
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+  }
 } 

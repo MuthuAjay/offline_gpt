@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+import uuid
 
 # Import the cache
 from cache import cache
@@ -268,9 +269,44 @@ def get_conversation_history(conversation_id: str, db: Session = Depends(get_db)
 
 @app.get("/api/conversations")
 def list_conversations(db: Session = Depends(get_db)):
-    """List all conversation IDs"""
+    """List all conversation IDs with titles"""
+    # Get unique conversation IDs
     conversation_ids = db.query(ChatHistory.conversation_id).distinct().all()
-    return {"conversations": [conv[0] for conv in conversation_ids]}
+    result = []
+    
+    for conv_id in conversation_ids:
+        conv_id = conv_id[0]
+        # Get the first user message as the title
+        first_message = db.query(ChatHistory).filter(
+            ChatHistory.conversation_id == conv_id,
+            ChatHistory.role == "user"
+        ).order_by(ChatHistory.id.asc()).first()
+        
+        title = "New conversation"
+        if first_message:
+            # Truncate long messages
+            content = first_message.content
+            if len(content) > 30:
+                content = content[:30] + "..."
+            title = content
+            
+        result.append({
+            "id": conv_id,
+            "title": title,
+            "timestamp": db.query(ChatHistory.timestamp).filter(
+                ChatHistory.conversation_id == conv_id
+            ).order_by(ChatHistory.id.desc()).first()[0]
+        })
+    
+    # Sort by timestamp (newest first)
+    result.sort(key=lambda x: x["timestamp"], reverse=True)
+    return {"conversations": result}
+
+@app.post("/api/conversations")
+def create_conversation():
+    """Create a new conversation and return its ID"""
+    conversation_id = str(uuid.uuid4())
+    return {"conversation_id": conversation_id}
 
 @app.delete("/api/history/{conversation_id}")
 def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):

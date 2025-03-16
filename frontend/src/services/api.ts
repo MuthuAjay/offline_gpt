@@ -67,4 +67,9 @@ export const createWebSocketConnection = (): WebSocket => {
   });
   
   return ws;
+};
+
+export const createNewConversation = async (): Promise<{conversation_id: string}> => {
+  const response = await api.post<{conversation_id: string}>('/conversations');
+  return response.data;
 }; 

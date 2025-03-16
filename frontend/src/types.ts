@@ -28,8 +28,14 @@ export interface ModelsResponse {
   models: ModelInfo[];
 }
 
+export interface Conversation {
+  id: string;
+  title: string;
+  timestamp: string;
+}
+
 export interface ConversationsResponse {
-  conversations: string[];
+  conversations: Conversation[];
 }
 
 export interface HistoryResponse {
