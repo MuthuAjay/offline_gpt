@@ -66,6 +66,22 @@ export const createWebSocketConnection = (): WebSocket => {
     console.log('WebSocket connection closed:', event.code, event.reason);
   });
   
+  // Set a timeout to handle connection issues
+  const connectionTimeout = setTimeout(() => {
+    if (ws.readyState !== WebSocket.OPEN) {
+      console.error('WebSocket connection timeout');
+      // Force close the connection if it's still connecting
+      if (ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+      }
+    }
+  }, 5000); // 5 seconds timeout
+  
+  // Clear the timeout when the connection is established
+  ws.addEventListener('open', () => {
+    clearTimeout(connectionTimeout);
+  });
+  
   return ws;
 };
 

@@ -21,6 +21,7 @@ const Chat: React.FC = () => {
   const ws = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const loadingTimeoutRef = useRef<number | null>(null);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -40,14 +41,31 @@ const Chat: React.FC = () => {
 
     loadHistory();
 
-    // Setup WebSocket
-    console.log('Creating WebSocket connection...');
-    ws.current = createWebSocketConnection();
+    // Set up WebSocket connection
+    if (!selectedModel) return;
+    
+    // Create WebSocket connection
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws`;
+    console.log(`Connecting to WebSocket at ${wsUrl}`);
+    
+    ws.current = new WebSocket(wsUrl);
     
     ws.current.onopen = () => {
       console.log('WebSocket connection established');
     };
     
+    ws.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setIsLoading(false); // Reset loading state on WebSocket error
+    };
+    
+    ws.current.onclose = (event) => {
+      console.log('WebSocket connection closed:', event);
+      setIsLoading(false); // Reset loading state when connection closes
+    };
+    
+    // WebSocket message handler
     ws.current.onmessage = (event) => {
       console.log('WebSocket message received:', event.data);
       try {
@@ -55,8 +73,18 @@ const Chat: React.FC = () => {
         
         if (data.error) {
           console.error('WebSocket error:', data.error);
+          setIsLoading(false); // Reset loading state on error
+          
+          // Clear the loading timeout
+          if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
+            loadingTimeoutRef.current = null;
+          }
           return;
         }
+        
+        // Check for done flag - Ollama may send it in different ways
+        const isDone = data.done === true || data.done === "true" || data.done === 1;
         
         if (data.message && data.message.content) {
           console.log('Received content chunk:', data.message.content);
@@ -84,34 +112,45 @@ const Chat: React.FC = () => {
               ];
             }
           });
+        }
+        
+        // Set loading to false when we receive the done flag
+        if (isDone) {
+          console.log('Response complete (done flag received), resetting loading state');
+          setIsLoading(false);
           
-          // Only set loading to false when we receive the "done" flag
-          if (data.done) {
-            setIsLoading(false);
+          // Clear the loading timeout
+          if (loadingTimeoutRef.current) {
+            clearTimeout(loadingTimeoutRef.current);
+            loadingTimeoutRef.current = null;
           }
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
         setIsLoading(false);
+        
+        // Clear the loading timeout
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = null;
+        }
       }
     };
     
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setIsLoading(false);
-    };
-    
-    ws.current.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
-    
+    // Clean up WebSocket connection when component unmounts
     return () => {
+      console.log('Cleaning up WebSocket connection');
       if (ws.current) {
-        console.log('Closing WebSocket connection');
         ws.current.close();
+        ws.current = null;
+      }
+      // Clear any pending timeouts
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
       }
     };
-  }, [conversationId]);
+  }, [selectedModel]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -137,6 +176,19 @@ const Chat: React.FC = () => {
     // Add to messages for display
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setIsLoading(true);
+    
+    // Clear any existing timeout
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+      loadingTimeoutRef.current = null;
+    }
+    
+    // Set a timeout to reset loading state in case of issues
+    loadingTimeoutRef.current = window.setTimeout(() => {
+      console.log('Loading timeout reached, resetting loading state');
+      setIsLoading(false);
+      loadingTimeoutRef.current = null;
+    }, 30000); // 30 seconds timeout
     
     // Save conversation ID to localStorage
     localStorage.setItem('currentConversationId', conversationId);
