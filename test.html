@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+</head>
+<body>
+    <h1>API Test</h1>
+    <button id="testApi">Test API</button>
+    <button id="testWebSocket">Test WebSocket</button>
+    <div id="result" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc;"></div>
+
+    <script>
+        document.getElementById('testApi').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing API...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/models');
+                const data = await response.json();
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            } catch (error) {
+                resultDiv.innerHTML = `Error: ${error.message}`;
+            }
+        });
+
+        document.getElementById('testWebSocket').addEventListener('click', () => {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing WebSocket...';
+            
+            const ws = new WebSocket('ws://localhost:8000/api/ws');
+            
+            ws.onopen = () => {
+                resultDiv.innerHTML += '<br>WebSocket connection opened';
+                
+                // Send a test message
+                const testMessage = {
+                    model: 'llama3.1:latest',
+                    messages: [
+                        { role: 'user', content: 'Hello, how are you?' }
+                    ]
+                };
+                
+                ws.send(JSON.stringify(testMessage));
+                resultDiv.innerHTML += '<br>Test message sent';
+            };
+            
+            ws.onmessage = (event) => {
+                resultDiv.innerHTML += `<br>Received: ${event.data}`;
+            };
+            
+            ws.onerror = (error) => {
+                resultDiv.innerHTML += `<br>Error: ${error.message}`;
+            };
+            
+            ws.onclose = () => {
+                resultDiv.innerHTML += '<br>WebSocket connection closed';
+            };
+        });
+    </script>
+</body>
+</html> 
