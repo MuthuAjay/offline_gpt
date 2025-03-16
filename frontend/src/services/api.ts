@@ -46,7 +46,25 @@ export const createEventSource = (request: ChatRequest): EventSource => {
 export const createWebSocketConnection = (): WebSocket => {
   // Use the current host for WebSocket connection
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+  const host = window.location.host;
+  const wsUrl = `${protocol}//${host}/api/ws`;
+  
+  console.log('Creating WebSocket connection to:', wsUrl);
+  
   const ws = new WebSocket(wsUrl);
+  
+  // Add connection event handlers
+  ws.addEventListener('open', () => {
+    console.log('WebSocket connection opened');
+  });
+  
+  ws.addEventListener('error', (error) => {
+    console.error('WebSocket connection error:', error);
+  });
+  
+  ws.addEventListener('close', (event) => {
+    console.log('WebSocket connection closed:', event.code, event.reason);
+  });
+  
   return ws;
 }; 

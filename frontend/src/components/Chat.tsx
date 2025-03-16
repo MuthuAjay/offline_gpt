@@ -57,22 +57,22 @@ const Chat: React.FC = () => {
         }
         
         if (data.message && data.message.content) {
-          console.log('Updating messages with new content');
+          console.log('Received content chunk:', data.message.content);
+          
           setMessages(prevMessages => {
-            // Check if we already have a response message from the assistant
             const lastMessage = prevMessages[prevMessages.length - 1];
             
             if (lastMessage && lastMessage.role === 'assistant') {
-              // Update the last message
-              return [
-                ...prevMessages.slice(0, -1),
-                {
-                  ...lastMessage,
-                  content: data.message.content,
-                },
-              ];
+              // For streaming, we need to APPEND the new content, not replace it
+              const updatedMessages = [...prevMessages];
+              updatedMessages[updatedMessages.length - 1] = {
+                ...lastMessage,
+                // Append the new content to the existing content
+                content: lastMessage.content + data.message.content,
+              };
+              return updatedMessages;
             } else {
-              // Add a new message
+              // If this is the first chunk, create a new message
               return [
                 ...prevMessages,
                 {
@@ -83,10 +83,14 @@ const Chat: React.FC = () => {
             }
           });
           
-          setIsLoading(false);
+          // Only set loading to false when we receive the "done" flag
+          if (data.done) {
+            setIsLoading(false);
+          }
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
+        setIsLoading(false);
       }
     };
     
