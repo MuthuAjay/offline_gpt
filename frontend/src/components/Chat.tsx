@@ -199,13 +199,20 @@ const Chat: React.FC = () => {
       
       // Update state
       setConversationId(id);
-      setMessages([]);
+      setIsLoading(false); // Reset loading state
       localStorage.setItem('currentConversationId', id);
       
       // Load conversation history
       const response = await fetchConversationHistory(id);
       if (response.messages && response.messages.length > 0) {
         setMessages(response.messages);
+        
+        // Scroll to bottom after messages load
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      } else {
+        setMessages([]);
       }
       
       // Reconnect WebSocket
