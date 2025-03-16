@@ -9,12 +9,27 @@ interface MessageItemProps {
 }
 
 const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
+  // Check if the message contains an image reference
+  const hasImage = message.content.includes('[Image attached]');
+  
+  // Extract the text content without the image reference
+  const textContent = hasImage 
+    ? message.content.replace('[Image attached]', '').trim() 
+    : message.content;
+  
   return (
     <div className={`p-4 rounded-lg my-2 ${message.role === 'user' ? 'message-user' : 'message-assistant'}`}>
       <div className="font-bold mb-1">
         {message.role === 'user' ? 'You' : 'Assistant'}
       </div>
       <div className="markdown-content">
+        {hasImage && message.role === 'user' && (
+          <div className="mb-2">
+            <div className="bg-gray-200 dark:bg-gray-700 rounded p-2 text-sm text-gray-600 dark:text-gray-300">
+              [Image uploaded]
+            </div>
+          </div>
+        )}
         <ReactMarkdown
           components={{
             code({ className, children }) {
@@ -35,7 +50,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
             },
           }}
         >
-          {message.content}
+          {textContent}
         </ReactMarkdown>
       </div>
     </div>

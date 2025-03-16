@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Message } from '../types';
+import { Message, ContentPart, MultimodalMessage } from '../types';
 import MessageItem from './MessageItem';
 import ChatInput from './ChatInput';
 import ModelSelector from './ModelSelector';
 import ThemeToggle from './ThemeToggle';
-import { createWebSocketConnection, fetchConversationHistory, createNewConversation } from '../services/api';
+import { createWebSocketConnection, fetchConversationHistory, createNewConversation, sendMultimodalChatRequest } from '../services/api';
 import Sidebar from './Sidebar';
 
 const Chat: React.FC = () => {
@@ -118,7 +118,7 @@ const Chat: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = (content: string, imageBase64?: string) => {
     if (!selectedModel) {
       alert('Please select a model first');
       return;
@@ -126,29 +126,97 @@ const Chat: React.FC = () => {
     
     console.log('Sending message with model:', selectedModel);
     
+    // Create user message for display
     const userMessage: Message = {
       role: 'user',
-      content,
+      content: imageBase64 
+        ? `${content} [Image attached]` 
+        : content,
     };
     
+    // Add to messages for display
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setIsLoading(true);
     
     // Save conversation ID to localStorage
     localStorage.setItem('currentConversationId', conversationId);
     
-    // Send message via WebSocket
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      const payload = {
+    if (imageBase64) {
+      // For multimodal messages, use the REST API
+      console.log('Sending multimodal message with image');
+      
+      // Create content parts
+      const contentParts: ContentPart[] = [];
+      
+      // Add text if provided
+      if (content.trim()) {
+        contentParts.push({
+          type: 'text',
+          text: content
+        });
+      }
+      
+      // Add image
+      contentParts.push({
+        type: 'image_url',
+        image_url: {
+          url: `data:image/jpeg;base64,${imageBase64}`
+        }
+      });
+      
+      // Prepare multimodal message format for the API
+      const multimodalMessages: MultimodalMessage[] = messages.map(msg => {
+        // Convert regular messages to multimodal format
+        return {
+          role: msg.role,
+          content: [{
+            type: 'text',
+            text: msg.content
+          }]
+        };
+      });
+      
+      // Add the new user message in multimodal format
+      multimodalMessages.push({
+        role: 'user',
+        content: contentParts
+      });
+      
+      // Send multimodal request
+      sendMultimodalChatRequest({
         model: selectedModel,
-        messages: [...messages, userMessage],
-        conversation_id: conversationId,
-      };
-      console.log('Sending WebSocket payload:', payload);
-      ws.current.send(JSON.stringify(payload));
+        messages: multimodalMessages,
+        conversation_id: conversationId
+      })
+      .then(response => {
+        // Handle the response
+        setMessages(prevMessages => [
+          ...prevMessages,
+          {
+            role: 'assistant',
+            content: response.message.content
+          }
+        ]);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error('Error sending multimodal message:', error);
+        setIsLoading(false);
+      });
     } else {
-      console.error('WebSocket is not connected. ReadyState:', ws.current?.readyState);
-      setIsLoading(false);
+      // For text-only, use WebSocket as before
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        const payload = {
+          model: selectedModel,
+          messages: [...messages, userMessage],
+          conversation_id: conversationId,
+        };
+        console.log('Sending WebSocket payload:', payload);
+        ws.current.send(JSON.stringify(payload));
+      } else {
+        console.error('WebSocket is not connected. ReadyState:', ws.current?.readyState);
+        setIsLoading(false);
+      }
     }
   };
 

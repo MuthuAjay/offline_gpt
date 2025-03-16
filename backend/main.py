@@ -2,15 +2,16 @@ import os
 import json
 import httpx
 import asyncio
-from typing import List, Dict, Optional
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
+import base64
+import uuid
+from typing import List, Dict, Optional, Any
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-import uuid
 
 # Import the cache
 from cache import cache
@@ -68,6 +69,22 @@ class ModelInfo(BaseModel):
     name: str
     size: str
     modified_at: str
+
+# Add a new model for multimodal messages
+class ContentPart(BaseModel):
+    type: str
+    text: Optional[str] = None
+    image_url: Optional[Dict[str, str]] = None
+
+class MultimodalMessage(BaseModel):
+    role: str
+    content: List[ContentPart]
+
+class MultimodalChatRequest(BaseModel):
+    model: str
+    messages: List[MultimodalMessage]
+    stream: bool = True
+    conversation_id: Optional[str] = None
 
 # API endpoints
 @app.get("/api/models")
@@ -301,6 +318,89 @@ def list_conversations(db: Session = Depends(get_db)):
     # Sort by timestamp (newest first)
     result.sort(key=lambda x: x["timestamp"], reverse=True)
     return {"conversations": result}
+
+@app.post("/api/chat/multimodal")
+async def multimodal_chat(request: MultimodalChatRequest):
+    """Non-streaming multimodal chat endpoint"""
+    try:
+        # Format the request for Ollama
+        payload = {
+            "model": request.model,
+            "messages": [{"role": msg.role, "content": msg.content} for msg in request.messages],
+            "stream": False
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{OLLAMA_API_URL}/chat", json=payload)
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Save to history if conversation_id is provided
+                if request.conversation_id:
+                    db = SessionLocal()
+                    # Save the last user message - for multimodal, store a reference to the image
+                    last_user_msg = next((msg for msg in reversed(request.messages) if msg.role == "user"), None)
+                    if last_user_msg:
+                        # For multimodal messages, we'll store a simplified version in the DB
+                        content_text = ""
+                        for content_part in last_user_msg.content:
+                            if content_part.type == "text":
+                                content_text += content_part.text + " "
+                            elif content_part.type == "image_url":
+                                content_text += "[IMAGE] "
+                        
+                        db_msg = ChatHistory(
+                            conversation_id=request.conversation_id,
+                            role="user",
+                            content=content_text.strip(),
+                            timestamp=str(asyncio.get_event_loop().time())
+                        )
+                        db.add(db_msg)
+                    
+                    # Save the assistant response
+                    db_response = ChatHistory(
+                        conversation_id=request.conversation_id,
+                        role="assistant",
+                        content=result["message"]["content"],
+                        timestamp=str(asyncio.get_event_loop().time())
+                    )
+                    db.add(db_response)
+                    db.commit()
+                
+                return result
+            else:
+                raise HTTPException(status_code=response.status_code, detail="Failed to get response from Ollama")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+@app.post("/api/upload")
+async def upload_image(file: UploadFile = File(...)):
+    """Upload an image and return a reference to it"""
+    try:
+        # Read the file content
+        contents = await file.read()
+        
+        # Create a unique filename
+        filename = f"{uuid.uuid4()}.{file.filename.split('.')[-1]}"
+        
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
+        
+        # Save the file
+        file_path = f"uploads/{filename}"
+        with open(file_path, "wb") as f:
+            f.write(contents)
+        
+        # Convert to base64 for Ollama
+        base64_image = base64.b64encode(contents).decode("utf-8")
+        
+        return {
+            "filename": filename,
+            "content_type": file.content_type,
+            "base64_data": base64_image
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error uploading file: {str(e)}")
 
 @app.post("/api/conversations")
 def create_conversation():

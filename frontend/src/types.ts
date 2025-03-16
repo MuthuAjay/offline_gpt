@@ -40,4 +40,31 @@ export interface ConversationsResponse {
 
 export interface HistoryResponse {
   messages: Message[];
+}
+
+// New types for multimodal support
+export interface ContentPart {
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: {
+    url: string;
+  };
+}
+
+export interface MultimodalMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: ContentPart[];
+}
+
+export interface MultimodalChatRequest {
+  model: string;
+  messages: MultimodalMessage[];
+  stream?: boolean;
+  conversation_id?: string;
+}
+
+export interface ImageUploadResponse {
+  filename: string;
+  content_type: string;
+  base64_data: string;
 } 

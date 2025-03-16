@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ChatRequest, ChatResponse, ConversationsResponse, HistoryResponse, ModelsResponse } from '../types';
+import { ChatRequest, ChatResponse, ConversationsResponse, HistoryResponse, ModelsResponse, MultimodalChatRequest, ImageUploadResponse } from '../types';
 
 // Use relative paths for API URLs in development
 const API_URL = '/api';
@@ -71,5 +71,27 @@ export const createWebSocketConnection = (): WebSocket => {
 
 export const createNewConversation = async (): Promise<{conversation_id: string}> => {
   const response = await api.post<{conversation_id: string}>('/conversations');
+  return response.data;
+};
+
+// New functions for multimodal support
+export const uploadImage = async (file: File): Promise<ImageUploadResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const response = await api.post<ImageUploadResponse>(
+    '/upload',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return response.data;
+};
+
+export const sendMultimodalChatRequest = async (request: MultimodalChatRequest): Promise<ChatResponse> => {
+  const response = await api.post<ChatResponse>('/chat/multimodal', request);
   return response.data;
 }; 
