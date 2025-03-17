@@ -215,7 +215,6 @@ const Chat: React.FC = () => {
     // Set a timeout to reset loading state in case of issues
     loadingTimeoutRef.current = window.setTimeout(() => {
       setIsLoading(false);
-      setError('Request timed out. Please try again.');
       loadingTimeoutRef.current = null;
     }, LOADING_TIMEOUT);
     
