@@ -19,7 +19,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  // Improved, safe date formatting function
+  // Improved date formatting function with IST timezone
   const formatDate = (dateString: string): string => {
     try {
       // Ensure we have a valid date string
@@ -27,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         return 'Unknown date';
       }
 
-      // Try to parse the date
+      // Try to parse the date from ISO format
       const date = new Date(dateString);
       
       // Check if the date is valid
@@ -35,37 +35,43 @@ const Sidebar: React.FC<SidebarProps> = ({
         return 'Invalid date';
       }
       
+      // Get IST date by adding 5 hours and 30 minutes to UTC
+      const istDate = new Date(date.getTime() + (5.5 * 60 * 60 * 1000));
+      
       const now = new Date();
-      const yesterday = new Date(now);
+      // Convert current date to IST as well
+      const istNow = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+      
+      const yesterday = new Date(istNow);
       yesterday.setDate(yesterday.getDate() - 1);
       
-      // Format the time portion
-      const timeString = date.toLocaleTimeString([], { 
+      // Format the time portion in IST
+      const timeString = istDate.toLocaleTimeString([], { 
         hour: '2-digit', 
         minute: '2-digit',
         hour12: true 
-      });
+      }) + ' IST';  // Add IST designation
       
-      // If the date is today
-      if (date.toDateString() === now.toDateString()) {
+      // If the date is today (in IST)
+      if (istDate.toDateString() === istNow.toDateString()) {
         return `Today at ${timeString}`;
       }
       
-      // If the date is yesterday
-      if (date.toDateString() === yesterday.toDateString()) {
+      // If the date is yesterday (in IST)
+      if (istDate.toDateString() === yesterday.toDateString()) {
         return `Yesterday at ${timeString}`;
       }
       
-      // If the date is within the current year
-      if (date.getFullYear() === now.getFullYear()) {
-        return date.toLocaleDateString([], { 
+      // If the date is within the current year (in IST)
+      if (istDate.getFullYear() === istNow.getFullYear()) {
+        return istDate.toLocaleDateString([], { 
           month: 'short', 
           day: 'numeric'
         }) + ` at ${timeString}`;
       }
       
-      // Otherwise, return the full date with year
-      return date.toLocaleDateString([], { 
+      // Otherwise, return the full date with year (in IST)
+      return istDate.toLocaleDateString([], { 
         year: 'numeric',
         month: 'short', 
         day: 'numeric'

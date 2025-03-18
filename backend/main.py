@@ -4,6 +4,7 @@ import httpx
 import asyncio
 import base64
 import uuid
+import datetime
 from typing import List, Dict, Optional, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -121,7 +122,7 @@ async def chat(request: ChatRequest):
                         conversation_id=request.conversation_id,
                         role="user",
                         content=last_user_msg.content,
-                        timestamp=str(asyncio.get_event_loop().time())
+                        timestamp=datetime.datetime.now().isoformat()
                     )
                     db.add(db_msg)
                 
@@ -130,7 +131,7 @@ async def chat(request: ChatRequest):
                     conversation_id=request.conversation_id,
                     role="assistant",
                     content=cached_response["message"]["content"],
-                    timestamp=str(asyncio.get_event_loop().time())
+                    timestamp=datetime.datetime.now().isoformat()
                 )
                 db.add(db_response)
                 db.commit()
@@ -161,7 +162,7 @@ async def chat(request: ChatRequest):
                             conversation_id=request.conversation_id,
                             role="user",
                             content=last_user_msg.content,
-                            timestamp=str(asyncio.get_event_loop().time())
+                            timestamp=datetime.datetime.now().isoformat()
                         )
                         db.add(db_msg)
                     
@@ -170,7 +171,7 @@ async def chat(request: ChatRequest):
                         conversation_id=request.conversation_id,
                         role="assistant",
                         content=result["message"]["content"],
-                        timestamp=str(asyncio.get_event_loop().time())
+                        timestamp=datetime.datetime.now().isoformat()
                     )
                     db.add(db_response)
                     db.commit()
@@ -237,7 +238,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         conversation_id=conversation_id,
                         role="user",
                         content=last_user_msg["content"],
-                        timestamp=str(asyncio.get_event_loop().time())
+                        timestamp=datetime.datetime.now().isoformat()
                     )
                     db.add(db_msg)
                     db.commit()
@@ -268,7 +269,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     conversation_id=conversation_id,
                     role="assistant",
                     content=full_response,
-                    timestamp=str(asyncio.get_event_loop().time())
+                    timestamp=datetime.datetime.now().isoformat()
                 )
                 db.add(db_response)
                 db.commit()
@@ -353,7 +354,7 @@ async def multimodal_chat(request: MultimodalChatRequest):
                             conversation_id=request.conversation_id,
                             role="user",
                             content=content_text.strip(),
-                            timestamp=str(asyncio.get_event_loop().time())
+                            timestamp=datetime.datetime.now().isoformat()
                         )
                         db.add(db_msg)
                     
@@ -362,7 +363,7 @@ async def multimodal_chat(request: MultimodalChatRequest):
                         conversation_id=request.conversation_id,
                         role="assistant",
                         content=result["message"]["content"],
-                        timestamp=str(asyncio.get_event_loop().time())
+                        timestamp=datetime.datetime.now().isoformat()
                     )
                     db.add(db_response)
                     db.commit()
@@ -417,4 +418,4 @@ def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
