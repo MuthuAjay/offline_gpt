@@ -40,35 +40,26 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       setError(null);
       setIsRetrying(false);
       
-      console.log('Fetching models...'); // Debug log
+      console.log('Fetching models...');
       const response = await fetchModels();
-      console.log('Raw API Response:', response); // Debug log
+      console.log('Raw API Response:', response);
       
-      if (!response) {
-        throw new Error('No response received from server');
+      if (!response || !response.models) {
+        throw new Error('Invalid response from server');
       }
 
-      if (!Array.isArray(response.models)) {
-        console.error('Invalid response structure:', response);
-        throw new Error('Server response does not contain models array');
-      }
+      const modelList = response.models.map((model: any) => ({
+        name: model.name || model.model || 'Unknown Model',
+        model: model.model || model.name || `unknown-${Math.random().toString(36).substring(2, 9)}`,
+        modified_at: model.modified_at || new Date().toISOString(),
+        size: typeof model.size === 'number' ? model.size : 0,
+        digest: model.digest || '',
+        details: model.details || {}
+      }));
       
-      const modelList = response.models.map((model: any) => {
-        console.log('Processing model:', model); // Debug log
-        return {
-          name: model.name || model.model || 'Unknown Model',
-          model: model.model || model.name || `unknown-${Math.random().toString(36).substring(2, 9)}`,
-          modified_at: model.modified_at || new Date().toISOString(),
-          size: typeof model.size === 'number' ? model.size : 0,
-          digest: model.digest || '',
-          details: model.details || {}
-        };
-      });
-      
-      console.log('Processed models:', modelList); // Debug log
+      console.log('Processed models:', modelList);
       setModels(modelList);
       
-      // If no model is selected and we have models, select default or first
       if ((!selectedModel || selectedModel === '') && modelList.length > 0) {
         const modelToSelect = defaultModel && modelList.find(m => m.model === defaultModel || m.name === defaultModel)
           ? defaultModel
@@ -76,11 +67,18 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         onModelChange(modelToSelect);
       }
     } catch (error) {
-      console.error('Detailed error:', error); // Debug log
-      const errorMessage = error instanceof Error
-        ? `Failed to load models: ${error.message}`
-        : 'An unknown error occurred while loading models';
-      setError(errorMessage);
+      console.error('Error loading models:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          setError('Connection is taking longer than expected. Please check your network and try again.');
+        } else if (error.message.includes('Network error')) {
+          setError('Network error. Please check your connection and try again.');
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError('An unexpected error occurred while loading models.');
+      }
     } finally {
       setLoading(false);
     }
@@ -88,7 +86,6 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   useEffect(() => {
     loadModels();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRetry = () => {

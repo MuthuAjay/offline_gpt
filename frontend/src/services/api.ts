@@ -12,7 +12,7 @@ import {
 
 // Constants
 const API_URL = '/api';
-const TIMEOUT = 30000; // 30 seconds timeout
+const TIMEOUT = 60000; // Increased to 60 seconds timeout
 const WEBSOCKET_TIMEOUT = 5000; // 5 seconds timeout
 
 /**
@@ -96,11 +96,30 @@ class ApiService {
     const cancelToken = this.getCancelToken(requestId).token;
     
     try {
-      const response = await this.instance.get<ModelsResponse>('/models', { cancelToken });
+      const response = await this.instance.get<ModelsResponse>('/models', { 
+        cancelToken,
+        timeout: TIMEOUT,
+        validateStatus: (status) => status >= 200 && status < 300
+      });
+      
       this.removeCancelToken(requestId);
+      
+      // Ensure the response has the expected structure
+      if (!response.data || !Array.isArray(response.data.models)) {
+        throw new Error('Invalid response format from server');
+      }
+      
       return response.data;
     } catch (error) {
       this.removeCancelToken(requestId);
+      if (axios.isAxiosError(error)) {
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Request timed out. Please try again.');
+        }
+        if (!error.response) {
+          throw new Error('Network error. Please check your connection.');
+        }
+      }
       throw error;
     }
   }
