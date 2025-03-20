@@ -48,7 +48,7 @@ body {
 /* Chat message styles */
 .message {
   margin: 1rem 0;
-  max-width: 85%;
+  max-width: 90%;
   display: flex;
   animation: fadeIn 0.3s ease-out;
 }
@@ -300,7 +300,7 @@ body {
   }
   
   .message {
-    max-width: 90%;
+    max-width: 95%;
   }
 }
 

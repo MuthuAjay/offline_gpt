@@ -541,7 +541,7 @@ const Chat: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-4xl mx-auto">
               {messages.map((message, index) => (
                 <MessageItem 
                   key={index} 
@@ -563,7 +563,7 @@ const Chat: React.FC = () => {
         
         {/* Chat input area */}
         <div className="bg-white dark:bg-gray-800 border-t border-neutral-200 dark:border-gray-700 p-4 md:p-6">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             {error && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-lg text-sm">
                 <strong>Error:</strong> {error}
