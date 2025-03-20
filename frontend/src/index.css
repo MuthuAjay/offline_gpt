@@ -6,12 +6,17 @@
 /* Root variables and theme configuration */
 :root {
   --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-  --indigo-light: #e0e7ff;
-  --indigo-dark: #312e81;
-  --gray-light: #f3f4f6;
-  --gray-dark: #1f2937;
+  --background-start-rgb: 249, 250, 251;
+  --background-end-rgb: 249, 250, 251;
+  --primary: #68E365;
+  --primary-dark: #58ce56;
+  --sidebar: #111827;
+  --sidebar-dark: #1f2937;
+  --sidebar-800: #1f2937;
+  --sidebar-700: #374151;
+  --sidebar-600: #4b5563;
+  --gray-light: #f9fafb;
+  --gray-dark: #111827;
   --code-bg: #1e293b;
   --border-color: #e5e7eb;
   --border-color-dark: #374151;
@@ -23,20 +28,15 @@
 /* Dark theme variables */
 .dark {
   --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 0, 0, 0;
-  --background-end-rgb: 0, 0, 0;
+  --background-start-rgb: 17, 24, 39;
+  --background-end-rgb: 17, 24, 39;
   --border-color: var(--border-color-dark);
 }
 
 /* Base styles */
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: rgb(var(--background-start-rgb));
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
@@ -47,20 +47,67 @@ body {
 
 /* Chat message styles */
 .message {
-  padding: 1rem;
-  margin: 0.5rem 0;
-  border-radius: 0.5rem;
-  transition: background-color var(--transition-speed) ease-in-out;
+  margin: 1rem 0;
+  max-width: 85%;
+  display: flex;
+  animation: fadeIn 0.3s ease-out;
 }
 
 .message-user {
-  @apply bg-indigo-50 dark:bg-indigo-900/30;
-  border-left: 4px solid var(--indigo-dark);
+  margin-left: auto;
+  margin-right: 1rem;
 }
 
 .message-assistant {
-  @apply bg-gray-50 dark:bg-gray-800/50;
-  border-left: 4px solid var(--gray-dark);
+  margin-right: auto;
+  margin-left: 1rem;
+}
+
+.message-content {
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.message-user .message-content {
+  background-color: var(--primary);
+  color: #fff;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.message-assistant .message-content {
+  background-color: #f3f4f6;
+  color: #111827;
+  border-bottom-left-radius: 0.25rem;
+}
+
+.dark .message-assistant .message-content {
+  background-color: #2d3748;
+  color: #f7fafc;
+}
+
+/* Avatar styles */
+.avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  margin-right: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+}
+
+.user-avatar {
+  background-color: var(--primary);
+  margin-left: 0.75rem;
+  margin-right: 0;
+}
+
+.assistant-avatar {
+  background-color: #6366f1;
 }
 
 /* Markdown content styling */
@@ -74,6 +121,10 @@ body {
   border: 1px solid var(--border-color);
 }
 
+.message-user .prose pre {
+  @apply bg-gray-800/90;
+}
+
 .prose code {
   @apply font-mono text-sm;
   padding: 0.1em 0.3em;
@@ -81,13 +132,23 @@ body {
   border-radius: 0.25rem;
 }
 
+.message-user .prose code {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: white;
+}
+
 .prose pre code {
   background-color: transparent;
   padding: 0;
+  color: #e2e8f0;
 }
 
 .prose p {
   @apply my-2;
+}
+
+.message-user .prose p {
+  color: white;
 }
 
 .prose h1 {
@@ -115,17 +176,20 @@ body {
 }
 
 .prose a {
-  @apply text-indigo-600 dark:text-indigo-400 underline;
+  @apply text-blue-600 dark:text-blue-400 underline;
   transition: color var(--transition-speed) ease-in-out;
 }
 
-.prose a:hover {
-  color: var(--text-link);
-  text-decoration: underline;
+.message-user .prose a {
+  @apply text-white underline;
 }
 
-.dark .prose a:hover {
-  color: var(--text-link-dark);
+.prose a:hover {
+  @apply text-blue-800 dark:text-blue-300;
+}
+
+.message-user .prose a:hover {
+  @apply text-white/90;
 }
 
 .prose blockquote {
@@ -133,6 +197,10 @@ body {
   background-color: rgba(var(--foreground-rgb), 0.05);
   padding: 0.5rem;
   border-radius: 0 0.25rem 0.25rem 0;
+}
+
+.message-user .prose blockquote {
+  @apply border-white/30 bg-white/10;
 }
 
 .prose table {
@@ -155,6 +223,8 @@ body {
 /* Sidebar styles */
 .sidebar {
   transition: transform var(--transition-speed) ease-in-out;
+  width: 280px;
+  background-color: var(--sidebar);
 }
 
 @media (max-width: 768px) {
@@ -163,8 +233,8 @@ body {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 250px;
-    z-index: 10;
+    width: 280px;
+    z-index: 30;
     transform: translateX(-100%);
   }
   
@@ -176,7 +246,7 @@ body {
     background-color: rgba(0, 0, 0, 0.5);
     position: fixed;
     inset: 0;
-    z-index: 5;
+    z-index: 20;
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--transition-speed) ease-in-out,
@@ -195,7 +265,7 @@ body {
 }
 
 .btn-primary {
-  @apply bg-indigo-600 text-white hover:bg-indigo-700;
+  @apply bg-primary text-white hover:bg-primary-dark;
 }
 
 .btn-secondary {
@@ -228,6 +298,10 @@ body {
     display: block;
     overflow-x: auto;
   }
+  
+  .message {
+    max-width: 90%;
+  }
 }
 
 /* Print styles */
@@ -239,5 +313,6 @@ body {
   .message {
     break-inside: avoid;
     border: 1px solid #ddd;
+    max-width: 100%;
   }
 }

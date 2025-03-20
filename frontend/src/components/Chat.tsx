@@ -418,60 +418,92 @@ const Chat: React.FC = () => {
   }, [conversationId, initializeWebSocket]);
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex h-screen bg-white dark:bg-gray-900 text-neutral-900 dark:text-white">
       {/* Sidebar */}
-      <div className={`sidebar ${sidebarOpen ? 'open' : ''} shadow-lg`}>
-        <Sidebar 
-          currentConversationId={conversationId}
-          onSelectConversation={(id) => {
-            setConversationId(id);
-            localStorage.setItem('currentConversationId', id);
-            setSidebarOpen(false); // Close sidebar on mobile after selection
-          }}
-          onNewChat={() => {
-            const newId = uuidv4();
-            createNewConversation(newId)
-              .then(() => {
-                setConversationId(newId);
-                localStorage.setItem('currentConversationId', newId);
-                setMessages([]);
-                setSidebarOpen(false); // Close sidebar on mobile after new chat
-              })
-              .catch(err => {
-                console.error('Error creating new conversation:', err);
-                setError('Failed to create new conversation');
-              });
-          }}
-        />
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''} bg-sidebar dark:bg-gray-800 text-white`}>
+        <div className="flex flex-col h-full">
+          {/* New Chat Button */}
+          <div className="p-3 flex items-center justify-between">
+            <h1 className="text-xl font-bold text-white flex items-center">
+              <span className="bg-primary text-white h-8 w-8 flex items-center justify-center rounded-md mr-2 text-sm font-bold">OG</span>
+              OfflineGPT
+            </h1>
+          </div>
+          
+          {/* New Chat button */}
+          <div className="p-3">
+            <button 
+              onClick={handleNewChat}
+              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-2.5 px-4 rounded-lg transition-colors font-medium"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              New Chat
+            </button>
+          </div>
+
+          {/* Conversation list */}
+          <Sidebar 
+            currentConversationId={conversationId}
+            onSelectConversation={handleSelectConversation}
+            onNewChat={handleNewChat}
+          />
+          
+          {/* Bottom section with settings */}
+          <div className="mt-auto border-t border-sidebar-700 p-2">
+            <div className="flex items-center justify-between px-3 py-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-white">
+                  <span className="text-sm font-medium">U</span>
+                </div>
+                <div className="text-sm">
+                  <div className="font-medium">User</div>
+                  <div className="text-xs text-gray-400">Free Plan</div>
+                </div>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+        </div>
       </div>
       
       {/* Sidebar overlay (mobile) */}
       <div 
-        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''} bg-black/50 backdrop-blur-sm`}
         onClick={() => setSidebarOpen(false)}
       ></div>
       
       {/* Main content area */}
       <div className="flex flex-col flex-grow overflow-hidden">
         {/* Header with model selector and burger menu */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10">
+        <header className="bg-white dark:bg-gray-800 border-b border-neutral-200 dark:border-gray-700 z-10">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center">
               {/* Hamburger menu for mobile */}
               <button 
-                className="mr-3 md:hidden text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="mr-3 md:hidden text-neutral-800 dark:text-white hover:text-neutral-900 dark:hover:text-gray-300"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 aria-label="Toggle sidebar"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
               
-              {/* Logo or brand name */}
-              <h1 className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">
-                OfflineGPT
-              </h1>
+              {/* Clear chat button */}
+              <button 
+                onClick={handleClearChat}
+                disabled={isLoading || messages.length === 0}
+                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed
+                  bg-neutral-100 dark:bg-gray-700 text-neutral-700 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-600 transition-colors"
+                aria-label="Clear chat"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear chat
+              </button>
             </div>
             
             <div className="flex items-center gap-3">
@@ -480,39 +512,36 @@ const Chat: React.FC = () => {
                 selectedModel={selectedModel} 
                 onModelChange={setSelectedModel}
               />
-              
-              {/* Theme toggle */}
-              <ThemeToggle />
             </div>
           </div>
         </header>
         
         {/* Chat messages area */}
-        <div className="flex-grow overflow-y-auto px-4 md:px-8 py-4 bg-white dark:bg-gray-900">
+        <div className="flex-grow overflow-y-auto px-4 md:px-8 py-4 bg-neutral-50 dark:bg-gray-900">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
-              <div className="max-w-md p-6 rounded-xl bg-white dark:bg-gray-800 shadow-md">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              <div className="max-w-md p-8 rounded-xl bg-white dark:bg-gray-800 shadow-sm">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Welcome to OfflineGPT</h2>
-                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to OfflineGPT</h2>
+                <p className="text-neutral-700 dark:text-gray-300 mb-6">
                   Start a conversation with your local AI assistant. Ask questions, get creative, or discuss ideas.
                 </p>
                 {!selectedModel && (
-                  <div className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg mb-4 text-sm">
+                  <div className="text-neutral-800 dark:text-gray-200 bg-neutral-100 dark:bg-gray-700 p-4 rounded-lg mb-4 text-sm border border-neutral-200 dark:border-gray-600">
                     <strong>Please select a model</strong> to start chatting.
                   </div>
                 )}
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                <div className="text-sm text-neutral-500 dark:text-gray-400 mt-4">
                   Your conversations are stored locally and never leave your device.
                 </div>
               </div>
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-3xl mx-auto">
               {messages.map((message, index) => (
                 <MessageItem 
                   key={index} 
@@ -520,10 +549,10 @@ const Chat: React.FC = () => {
                 />
               ))}
               {isLoading && (
-                <div className="my-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse">
+                <div className="my-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm animate-pulse">
                   <div className="flex items-center">
-                    <div className="h-4 w-4 mr-2 rounded-full bg-indigo-400 dark:bg-indigo-600"></div>
-                    <div className="h-4 flex-grow rounded bg-gray-300 dark:bg-gray-600"></div>
+                    <div className="h-4 w-4 mr-2 rounded-full bg-neutral-300 dark:bg-gray-600"></div>
+                    <div className="h-4 flex-grow rounded bg-neutral-200 dark:bg-gray-700"></div>
                   </div>
                 </div>
               )}
@@ -533,18 +562,21 @@ const Chat: React.FC = () => {
         </div>
         
         {/* Chat input area */}
-        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 md:p-6">
-          <div className="max-w-4xl mx-auto">
+        <div className="bg-white dark:bg-gray-800 border-t border-neutral-200 dark:border-gray-700 p-4 md:p-6">
+          <div className="max-w-3xl mx-auto">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-lg text-sm">
                 <strong>Error:</strong> {error}
               </div>
             )}
             <ChatInput 
               onSendMessage={handleSendMessage} 
               disabled={isLoading || !selectedModel}
-              placeholder={selectedModel ? "Type your message..." : "Please select a model to start chatting"}
+              placeholder="Ask to OfflineGPT..."
             />
+            <div className="mt-2 text-xs text-neutral-500 dark:text-gray-400 text-center">
+              Running on local models. Powered by OfflineGPT v1.0.0
+            </div>
           </div>
         </div>
       </div>
