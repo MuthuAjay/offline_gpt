@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError, AxiosRequestConfig, CancelTokenSource } from 'axios';
+import axios, { AxiosInstance, AxiosError, CancelTokenSource } from 'axios';
 import { 
   ChatRequest, 
   ChatResponse, 
