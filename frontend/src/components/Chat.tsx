@@ -418,139 +418,132 @@ const Chat: React.FC = () => {
   }, [conversationId, initializeWebSocket]);
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div 
-          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-10"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      
-      {/* Mobile sidebar toggle */}
-      <button
-        className="md:hidden fixed top-4 left-4 z-20 p-2 rounded-md bg-gray-200 dark:bg-gray-700"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        aria-label="Toggle sidebar"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16M4 18h16"
-          />
-        </svg>
-      </button>
-      
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Sidebar */}
-      <div className={`
-        fixed md:static inset-y-0 left-0 z-10 transform 
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
-        md:translate-x-0 transition duration-200 ease-in-out
-        bg-white dark:bg-gray-800 w-64 shadow-lg
-      `}>
-        <Sidebar
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''} shadow-lg`}>
+        <Sidebar 
           currentConversationId={conversationId}
-          onSelectConversation={handleSelectConversation}
-          onNewChat={handleNewChat}
+          onSelectConversation={(id) => {
+            setConversationId(id);
+            localStorage.setItem('currentConversationId', id);
+            setSidebarOpen(false); // Close sidebar on mobile after selection
+          }}
+          onNewChat={() => {
+            const newId = uuidv4();
+            createNewConversation(newId)
+              .then(() => {
+                setConversationId(newId);
+                localStorage.setItem('currentConversationId', newId);
+                setMessages([]);
+                setSidebarOpen(false); // Close sidebar on mobile after new chat
+              })
+              .catch(err => {
+                console.error('Error creating new conversation:', err);
+                setError('Failed to create new conversation');
+              });
+          }}
         />
       </div>
       
-      {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm p-4">
-          <div className="container mx-auto flex flex-col md:flex-row justify-between items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-800 dark:text-white">Offline GPT</h1>
-            <div className="flex flex-wrap items-center gap-2 md:gap-4 justify-center md:justify-end">
-              <ModelSelector
-                selectedModel={selectedModel}
-                onSelectModel={setSelectedModel}
-              />
-              <ThemeToggle />
-              <button
-                onClick={handleClearChat}
-                className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
-                disabled={isLoading || messages.length === 0}
-                aria-label="Clear chat"
+      {/* Sidebar overlay (mobile) */}
+      <div 
+        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      ></div>
+      
+      {/* Main content area */}
+      <div className="flex flex-col flex-grow overflow-hidden">
+        {/* Header with model selector and burger menu */}
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center">
+              {/* Hamburger menu for mobile */}
+              <button 
+                className="mr-3 md:hidden text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                aria-label="Toggle sidebar"
               >
-                Clear Chat
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
               </button>
+              
+              {/* Logo or brand name */}
+              <h1 className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">
+                OfflineGPT
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              {/* Model selector */}
+              <ModelSelector 
+                selectedModel={selectedModel} 
+                onModelChange={setSelectedModel}
+              />
+              
+              {/* Theme toggle */}
+              <ThemeToggle />
             </div>
           </div>
         </header>
         
-        {/* Error banner */}
-        {error && (
-          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <p>{error}</p>
-            </div>
-            <button 
-              onClick={() => setError(null)} 
-              className="absolute top-1 right-1 text-red-700"
-              aria-label="Dismiss error"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-        
-        {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="container mx-auto max-w-4xl">
-            {messages.length === 0 ? (
-              <div className="text-center py-10">
-                <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-300 mb-2">
-                  Welcome to Offline GPT
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Start a conversation with an AI assistant powered by Ollama.
+        {/* Chat messages area */}
+        <div className="flex-grow overflow-y-auto px-4 md:px-8 py-4 bg-white dark:bg-gray-900">
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center">
+              <div className="max-w-md p-6 rounded-xl bg-white dark:bg-gray-800 shadow-md">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Welcome to OfflineGPT</h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Start a conversation with your local AI assistant. Ask questions, get creative, or discuss ideas.
                 </p>
                 {!selectedModel && (
-                  <p className="text-blue-600 dark:text-blue-400 mt-4">
-                    Please select a model from the dropdown above to begin.
-                  </p>
+                  <div className="text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg mb-4 text-sm">
+                    <strong>Please select a model</strong> to start chatting.
+                  </div>
                 )}
-              </div>
-            ) : (
-              messages.map((message, index) => (
-                <MessageItem key={`${index}-${message.content.substring(0, 10)}`} message={message} />
-              ))
-            )}
-            
-            {isLoading && (
-              <div className="p-4 rounded-lg my-2 message-assistant">
-                <div className="font-bold mb-1">Assistant</div>
-                <div className="animate-pulse flex space-x-2">
-                  <div className="h-2 w-2 bg-gray-500 rounded-full"></div>
-                  <div className="h-2 w-2 bg-gray-500 rounded-full"></div>
-                  <div className="h-2 w-2 bg-gray-500 rounded-full"></div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                  Your conversations are stored locally and never leave your device.
                 </div>
               </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto">
+              {messages.map((message, index) => (
+                <MessageItem 
+                  key={index} 
+                  message={message}
+                />
+              ))}
+              {isLoading && (
+                <div className="my-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse">
+                  <div className="flex items-center">
+                    <div className="h-4 w-4 mr-2 rounded-full bg-indigo-400 dark:bg-indigo-600"></div>
+                    <div className="h-4 flex-grow rounded bg-gray-300 dark:bg-gray-600"></div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
         
-        {/* Chat Input */}
-        <div className="bg-white dark:bg-gray-800 p-4 border-t dark:border-gray-700">
-          <div className="container mx-auto max-w-4xl">
+        {/* Chat input area */}
+        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 md:p-6">
+          <div className="max-w-4xl mx-auto">
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm">
+                <strong>Error:</strong> {error}
+              </div>
+            )}
             <ChatInput 
               onSendMessage={handleSendMessage} 
-              disabled={isLoading || !selectedModel} 
-              placeholder={selectedModel ? "Type a message..." : "Please select a model first"}
+              disabled={isLoading || !selectedModel}
+              placeholder={selectedModel ? "Type your message..." : "Please select a model to start chatting"}
             />
           </div>
         </div>

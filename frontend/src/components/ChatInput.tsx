@@ -4,17 +4,17 @@ import ImageUploader from './ImageUploader';
 interface ChatInputProps {
   onSendMessage: (message: string, imageBase64?: string) => void;
   disabled: boolean;
-  placeholder?: string; // Added placeholder prop
+  placeholder?: string;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({ 
   onSendMessage, 
   disabled, 
-  placeholder = "Type your message..." // Default value
+  placeholder = "Type your message..."
 }) => {
   const [message, setMessage] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [isComposing, setIsComposing] = useState(false); // For IME support
+  const [isComposing, setIsComposing] = useState(false);
 
   const handleSendMessage = () => {
     if ((message.trim() || imageBase64) && !disabled) {
@@ -25,7 +25,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Don't trigger send if using IME (for languages like Chinese, Japanese)
     if (isComposing) return;
     
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -38,14 +37,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setImageBase64(base64Data);
   };
 
-  // Automatically resize textarea height based on content
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = e.target;
     setMessage(textarea.value);
     
-    // Reset height to auto to properly calculate new height
     textarea.style.height = 'auto';
-    // Set new height based on scrollHeight
     textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
   };
 
@@ -70,7 +66,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         </div>
       )}
-      <div className="flex items-end border rounded-lg bg-white dark:bg-gray-700 p-2 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50 transition">
+      <div className="flex items-end border rounded-lg bg-white dark:bg-gray-700 p-2 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-opacity-50 transition">
         <textarea
           className="flex-grow px-3 py-2 bg-transparent outline-none resize-none dark:text-white min-h-[50px]"
           placeholder={placeholder}
@@ -87,7 +83,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <ImageUploader onImageUploaded={handleImageUploaded} disabled={disabled} />
           <button
             type="button"
-            className="ml-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="ml-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             onClick={handleSendMessage}
             disabled={(!message.trim() && !imageBase64) || disabled}
             aria-label="Send message"

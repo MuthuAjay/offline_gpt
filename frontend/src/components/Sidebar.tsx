@@ -144,12 +144,17 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <div className="w-64 bg-gray-100 dark:bg-gray-800 h-full flex flex-col">
-      {/* Header with new chat button */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+    <div className="w-64 h-full flex flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+      {/* Header with logo and new chat button */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col gap-4">
+        <div className="flex items-center justify-center py-1">
+          <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+            OfflineGPT
+          </h1>
+        </div>
         <button
           onClick={onNewChat}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50"
           aria-label="Start a new chat"
         >
           <svg 
@@ -169,14 +174,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
       
       {/* Search input */}
-      <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-3 border-b border-gray-200 dark:border-gray-700">
         <div className="relative">
           <input
             type="text"
             placeholder="Search conversations..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 pl-8 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-white"
+            className="w-full px-3 py-2 pl-8 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white shadow-sm"
             aria-label="Search conversations"
           />
           <svg
@@ -216,7 +221,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       {/* Error message */}
       {error && (
-        <div className="p-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-sm m-2 rounded">
+        <div className="p-2 m-2 bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-sm rounded">
           {error}
           <button 
             onClick={() => loadConversations()} 
@@ -231,11 +236,11 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto">
         {loading && conversations.length === 0 ? (
           <div className="text-center py-4 text-gray-500 dark:text-gray-400 flex items-center justify-center">
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Loading conversations...
+            Loading...
           </div>
         ) : filteredConversations.length === 0 ? (
           <div className="text-center py-8 px-4">
@@ -251,46 +256,52 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
         ) : (
-          <ul className="space-y-1 px-2 py-2">
-            {filteredConversations.map((conversation) => (
-              <li key={conversation.id}>
-                <button
+          <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredConversations.map(conversation => (
+              <li 
+                key={conversation.id}
+                className={`${
+                  currentConversationId === conversation.id 
+                    ? 'bg-indigo-50 dark:bg-indigo-900/30 border-l-4 border-indigo-500' 
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-700 border-l-4 border-transparent'
+                } transition-colors duration-150 cursor-pointer`}
+              >
+                <div
                   onClick={() => onSelectConversation(conversation.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    currentConversationId === conversation.id
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100'
-                      : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200'
-                  } relative group`}
-                  aria-current={currentConversationId === conversation.id ? 'page' : undefined}
+                  className="flex justify-between items-center p-3"
                 >
-                  <div className="truncate font-medium">{conversation.title || 'Untitled Conversation'}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
-                    {formatDate(conversation.timestamp)}
+                  <div className="flex-1 min-w-0">
+                    <h3 className={`text-sm font-medium truncate ${
+                      currentConversationId === conversation.id 
+                        ? 'text-indigo-700 dark:text-indigo-300' 
+                        : 'text-gray-800 dark:text-gray-200'
+                    }`}>
+                      {conversation.title}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {formatDate(conversation.timestamp)}
+                    </p>
                   </div>
-                  
-                  {/* Delete button - only show on hover or for current conversation */}
                   <button
                     onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                    className={`absolute right-2 top-2 p-1 rounded-full ${
-                      currentConversationId === conversation.id 
-                        ? 'opacity-100' 
-                        : 'opacity-0 group-hover:opacity-100'
-                    } hover:bg-gray-300 dark:hover:bg-gray-600 transition-opacity focus:outline-none focus:ring-2 focus:ring-red-500`}
-                    aria-label={`Delete conversation: ${conversation.title}`}
+                    className={`text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                      isDeleting === conversation.id ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                     disabled={isDeleting === conversation.id}
+                    aria-label="Delete conversation"
                   >
                     {isDeleting === conversation.id ? (
-                      <svg className="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     )}
                   </button>
-                </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -299,14 +310,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       {/* Footer */}
       <div className="p-3 text-xs text-center text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700">
-        <a 
-          href="https://github.com/ollama/ollama" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-        >
-          Powered by Ollama
-        </a>
+        Running locally on your device
       </div>
     </div>
   );

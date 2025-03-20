@@ -8,15 +8,15 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
-  --blue-light: #dbeafe;
-  --blue-dark: #1e3a8a;
+  --indigo-light: #e0e7ff;
+  --indigo-dark: #312e81;
   --gray-light: #f3f4f6;
   --gray-dark: #1f2937;
   --code-bg: #1e293b;
   --border-color: #e5e7eb;
   --border-color-dark: #374151;
-  --text-link: #2563eb;
-  --text-link-dark: #60a5fa;
+  --text-link: #4f46e5;
+  --text-link-dark: #818cf8;
   --transition-speed: 0.2s;
 }
 
@@ -54,102 +54,101 @@ body {
 }
 
 .message-user {
-  @apply bg-blue-100 dark:bg-blue-900;
-  border-left: 4px solid var(--blue-dark);
+  @apply bg-indigo-50 dark:bg-indigo-900/30;
+  border-left: 4px solid var(--indigo-dark);
 }
 
 .message-assistant {
-  @apply bg-gray-100 dark:bg-gray-800;
+  @apply bg-gray-50 dark:bg-gray-800/50;
   border-left: 4px solid var(--gray-dark);
 }
 
 /* Markdown content styling */
-.markdown-content {
-  overflow-wrap: break-word;
-  word-wrap: break-word;
+.prose {
+  @apply text-gray-800 dark:text-gray-200;
 }
 
-.markdown-content pre {
+.prose pre {
   @apply bg-gray-800 text-white p-4 rounded-md overflow-x-auto my-2;
   position: relative;
   border: 1px solid var(--border-color);
 }
 
-.markdown-content code {
+.prose code {
   @apply font-mono text-sm;
   padding: 0.1em 0.3em;
   background-color: rgba(var(--foreground-rgb), 0.1);
   border-radius: 0.25rem;
 }
 
-.markdown-content pre code {
+.prose pre code {
   background-color: transparent;
   padding: 0;
 }
 
-.markdown-content p {
+.prose p {
   @apply my-2;
 }
 
-.markdown-content h1 {
+.prose h1 {
   @apply text-2xl font-bold my-4;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.5rem;
 }
 
-.markdown-content h2 {
+.prose h2 {
   @apply text-xl font-bold my-3;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 0.3rem;
 }
 
-.markdown-content h3 {
+.prose h3 {
   @apply text-lg font-bold my-2;
 }
 
-.markdown-content ul {
+.prose ul {
   @apply list-disc pl-5 my-2;
 }
 
-.markdown-content ol {
+.prose ol {
   @apply list-decimal pl-5 my-2;
 }
 
-.markdown-content a {
-  @apply text-blue-600 dark:text-blue-400 underline;
+.prose a {
+  @apply text-indigo-600 dark:text-indigo-400 underline;
   transition: color var(--transition-speed) ease-in-out;
 }
 
-.markdown-content a:hover {
+.prose a:hover {
   color: var(--text-link);
   text-decoration: underline;
 }
 
-.dark .markdown-content a:hover {
+.dark .prose a:hover {
   color: var(--text-link-dark);
 }
 
-.markdown-content blockquote {
+.prose blockquote {
   @apply border-l-4 border-gray-300 dark:border-gray-700 pl-4 italic my-2;
   background-color: rgba(var(--foreground-rgb), 0.05);
   padding: 0.5rem;
   border-radius: 0 0.25rem 0.25rem 0;
 }
 
-.markdown-content table {
+.prose table {
   @apply w-full border-collapse my-4;
 }
 
-.markdown-content table th,
-.markdown-content table td {
+.prose table th,
+.prose table td {
   @apply border border-gray-300 dark:border-gray-700 p-2;
 }
 
-.markdown-content table th {
+.prose table th {
   @apply bg-gray-100 dark:bg-gray-800;
 }
 
-.markdown-content img {
+.prose img {
   @apply max-w-full h-auto my-4 mx-auto rounded-md;
 }
 
@@ -196,7 +195,7 @@ body {
 }
 
 .btn-primary {
-  @apply bg-blue-600 text-white hover:bg-blue-700;
+  @apply bg-indigo-600 text-white hover:bg-indigo-700;
 }
 
 .btn-secondary {
@@ -219,13 +218,13 @@ body {
 
 /* Responsive utilities */
 @media (max-width: 640px) {
-  .markdown-content pre {
+  .prose pre {
     margin-left: -1rem;
     margin-right: -1rem;
     border-radius: 0;
   }
   
-  .markdown-content table {
+  .prose table {
     display: block;
     overflow-x: auto;
   }
