@@ -18,6 +18,7 @@ const LOADING_TIMEOUT = 30000; // 30 seconds timeout
 const Chat: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [selectedModel, setSelectedModel] = useState(() => {
     return localStorage.getItem('selectedModel') || '';
   });
@@ -52,12 +53,14 @@ const Chat: React.FC = () => {
     newWs.onerror = (error) => {
       console.error('WebSocket error:', error);
       setIsLoading(false);
+      setIsTyping(false);
       setError('Failed to connect to the server. Please check your network connection.');
     };
     
     newWs.onclose = (event) => {
       console.log('WebSocket connection closed:', event);
       setIsLoading(false);
+      setIsTyping(false);
       
       // Only set error if it wasn't a normal closure
       if (event.code !== 1000) {
@@ -73,6 +76,7 @@ const Chat: React.FC = () => {
         if (data.error) {
           console.error('WebSocket error:', data.error);
           setIsLoading(false);
+          setIsTyping(false);
           setError(`Server error: ${data.error}`);
           
           // Clear the loading timeout
@@ -87,6 +91,11 @@ const Chat: React.FC = () => {
         const isDone = data.done === true || data.done === "true" || data.done === 1;
         
         if (data.message && data.message.content) {
+          // Show typing indicator on first chunk
+          if (!isTyping) {
+            setIsTyping(true);
+          }
+          
           setMessages(prevMessages => {
             const lastMessage = prevMessages[prevMessages.length - 1];
             
@@ -106,6 +115,7 @@ const Chat: React.FC = () => {
                 {
                   role: 'assistant',
                   content: data.message.content,
+                  reactions: [],
                 },
               ];
             }
@@ -115,6 +125,7 @@ const Chat: React.FC = () => {
         // Set loading to false when we receive the done flag
         if (isDone) {
           setIsLoading(false);
+          setIsTyping(false);
           
           // Clear the loading timeout
           if (loadingTimeoutRef.current) {
@@ -125,6 +136,7 @@ const Chat: React.FC = () => {
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
         setIsLoading(false);
+        setIsTyping(false);
         setError('Failed to process server response. Please try again.');
         
         // Clear the loading timeout
@@ -144,7 +156,12 @@ const Chat: React.FC = () => {
       try {
         const response = await fetchConversationHistory(conversationId);
         if (response.messages && response.messages.length > 0) {
-          setMessages(response.messages);
+          // Make sure all messages have a reactions array
+          const messagesWithReactions = response.messages.map(msg => ({
+            ...msg,
+            reactions: msg.reactions || [],
+          }));
+          setMessages(messagesWithReactions);
         }
       } catch (error) {
         console.error('Error loading conversation history:', error);
@@ -181,7 +198,7 @@ const Chat: React.FC = () => {
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isTyping]);
 
   // Handler for sending messages
   const handleSendMessage = useCallback(async (content: string, imageBase64?: string) => {
@@ -201,6 +218,7 @@ const Chat: React.FC = () => {
       content: imageBase64 
         ? `${content} [Image attached]` 
         : content,
+      reactions: [],
     };
     
     // Add to messages for display
@@ -215,6 +233,7 @@ const Chat: React.FC = () => {
     // Set a timeout to reset loading state in case of issues
     loadingTimeoutRef.current = window.setTimeout(() => {
       setIsLoading(false);
+      setIsTyping(false);
       setError('Request timed out. Please try again.');
       loadingTimeoutRef.current = null;
     }, LOADING_TIMEOUT);
@@ -275,7 +294,8 @@ const Chat: React.FC = () => {
           ...prevMessages,
           {
             role: 'assistant',
-            content: response.message.content
+            content: response.message.content,
+            reactions: [],
           }
         ]);
         setIsLoading(false);
@@ -315,6 +335,7 @@ const Chat: React.FC = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       setIsLoading(false);
+      setIsTyping(false);
       setError('Failed to send message. Please try again.');
       
       // Clear the loading timeout
@@ -391,7 +412,12 @@ const Chat: React.FC = () => {
       // Load conversation history
       const response = await fetchConversationHistory(id);
       if (response.messages && response.messages.length > 0) {
-        setMessages(response.messages);
+        // Make sure all messages have a reactions array
+        const messagesWithReactions = response.messages.map(msg => ({
+          ...msg,
+          reactions: msg.reactions || [],
+        }));
+        setMessages(messagesWithReactions);
         
         // Scroll to bottom after messages load
         setTimeout(() => {
@@ -425,8 +451,8 @@ const Chat: React.FC = () => {
           {/* New Chat Button */}
           <div className="p-3 flex items-center justify-between">
             <h1 className="text-xl font-bold text-white flex items-center">
-              <span className="bg-primary text-white h-8 w-8 flex items-center justify-center rounded-md mr-2 text-sm font-bold">OG</span>
-              OfflineGPT
+              <span className="bg-neutrax-green text-white h-8 w-8 flex items-center justify-center rounded-md mr-2 text-sm font-bold">NT</span>
+              NeutraxGPT
             </h1>
           </div>
           
@@ -434,7 +460,7 @@ const Chat: React.FC = () => {
           <div className="p-3">
             <button 
               onClick={handleNewChat}
-              className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white py-2.5 px-4 rounded-lg transition-colors font-medium"
+              className="w-full flex items-center justify-center gap-2 bg-neutrax-green hover:bg-neutrax-green/90 text-white py-2.5 px-4 rounded-lg transition-colors font-medium"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -454,7 +480,7 @@ const Chat: React.FC = () => {
           <div className="mt-auto border-t border-sidebar-700 p-2">
             <div className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-white">
+                <div className="h-8 w-8 rounded-full bg-neutrax-green/20 flex items-center justify-center text-white">
                   <span className="text-sm font-medium">U</span>
                 </div>
                 <div className="text-sm">
@@ -521,12 +547,12 @@ const Chat: React.FC = () => {
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <div className="max-w-md p-8 rounded-xl bg-white dark:bg-gray-800 shadow-sm">
-                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-neutrax-green/10 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-neutrax-green" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to OfflineGPT</h2>
+                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to NeutraxGPT</h2>
                 <p className="text-neutral-700 dark:text-gray-300 mb-6">
                   Start a conversation with your local AI assistant. Ask questions, get creative, or discuss ideas.
                 </p>
@@ -546,16 +572,25 @@ const Chat: React.FC = () => {
                 <MessageItem 
                   key={index} 
                   message={message}
+                  isConsecutive={index > 0 && messages[index - 1].role === message.role}
+                  index={index}
+                  messages={messages}
                 />
               ))}
-              {isLoading && (
-                <div className="my-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm animate-pulse">
-                  <div className="flex items-center">
-                    <div className="h-4 w-4 mr-2 rounded-full bg-neutral-300 dark:bg-gray-600"></div>
-                    <div className="h-4 flex-grow rounded bg-neutral-200 dark:bg-gray-700"></div>
+              
+              {isTyping && (
+                <div className="flex mb-6">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-gradient-to-br from-neutrax-green to-neutrax-green/90 mr-3 ring-1 ring-neutrax-green/30 shadow-sm">
+                    <div className="text-white h-6 w-6 flex items-center justify-center text-xs font-bold drop-shadow-sm">NT</div>
+                  </div>
+                  <div className="flex space-x-1 mt-2 px-3 py-2 bg-neutrax-light dark:bg-neutrax-green/10 rounded-bubble animate-fadeIn">
+                    <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse delay-75"></div>
+                    <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse delay-150"></div>
                   </div>
                 </div>
               )}
+              
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -572,10 +607,10 @@ const Chat: React.FC = () => {
             <ChatInput 
               onSendMessage={handleSendMessage} 
               disabled={isLoading || !selectedModel}
-              placeholder="Ask to OfflineGPT..."
+              placeholder="Ask to NeutraxGPT..."
             />
             <div className="mt-2 text-xs text-neutral-500 dark:text-gray-400 text-center">
-              Running on local models. Powered by OfflineGPT v1.0.0
+              Running on local models. Powered by NeutraxGPT v1.0.0
             </div>
           </div>
         </div>

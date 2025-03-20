@@ -45,20 +45,22 @@ export type ContentPart = TextContent | ImageUrlContent | FileUrlContent | CodeC
 // Message roles
 export type MessageRole = 'user' | 'assistant' | 'system';
 
-// Basic message format
+// Basic message format (with reactions)
 export interface Message {
   role: MessageRole;
   content: string;
   id?: string;
   timestamp?: string;
+  reactions?: string[];  // Array of emoji reactions
 }
 
-// Multimodal message format
+// Multimodal message format (with reactions)
 export interface MultimodalMessage {
   role: MessageRole;
   content: ContentPart[];
   id?: string;
   timestamp?: string;
+  reactions?: string[];  // Array of emoji reactions
 }
 
 /**
@@ -101,6 +103,7 @@ export interface ChatResponse {
     role: string;
     content: string;
     id?: string;
+    reactions?: string[];  // Array of emoji reactions
   };
   done: boolean;
   conversation_id?: string;
@@ -113,6 +116,7 @@ export interface StreamResponseChunk {
   message: {
     role: string;
     content: string;
+    reactions?: string[];  // Array of emoji reactions
   };
   done: boolean;
 }
@@ -206,6 +210,7 @@ export interface EventSourceMessage {
 export interface ChatState {
   messages: Message[];
   isLoading: boolean;
+  isTyping?: boolean;  // Added typing indicator state
   error: string | null;
   conversation_id: string | null;
   model: string;
@@ -222,4 +227,15 @@ export interface UploadState {
       size: number;
     };
   };
+}
+
+/**
+ * MessageItem Component Props
+ */
+export interface MessageItemProps {
+  message: Message;
+  isTyping?: boolean;
+  isConsecutive?: boolean;
+  index: number;
+  messages: Message[];
 }
