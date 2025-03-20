@@ -77,14 +77,16 @@ body {
 }
 
 .message-assistant .message-content {
-  background-color: #f3f4f6;
+  background-color: #F0F9EF !important; /* neutrax-light color */
   color: #111827;
   border-bottom-left-radius: 0.25rem;
+  border: 1px solid #DDF6DC; /* neutrax-border color */
 }
 
 .dark .message-assistant .message-content {
-  background-color: #2d3748;
+  background-color: rgba(104, 227, 101, 0.1) !important; /* neutrax-green/10 */
   color: #f7fafc;
+  border: 1px solid rgba(104, 227, 101, 0.3); /* neutrax-green/30 */
 }
 
 /* Avatar styles */

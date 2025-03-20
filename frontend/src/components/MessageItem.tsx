@@ -1,38 +1,17 @@
 import React, { useState } from 'react';
-import { Message } from '../types';
+import { Message, MessageItemProps } from '../types';
 import ReactMarkdown from 'react-markdown';
-
-interface MessageItemProps {
-  message: Message;
-  isTyping?: boolean;
-  isConsecutive?: boolean;
-  index: number;
-  messages: Message[];
-}
+import { AVAILABLE_REACTIONS } from '../utils/message-reactions';
 
 const MessageItem: React.FC<MessageItemProps> = ({ 
   message, 
   isTyping = false,
+  isConsecutive = false,
   index = 0,
-  messages = []
+  messages = [],
+  onToggleReaction,
 }) => {
   const isUser = message.role === 'user';
-  const isConsecutive = index > 0 && messages[index - 1].role === message.role;
-  
-  // State for emoji reactions
-  const [reactions, setReactions] = useState<string[]>(message.reactions || []);
-  
-  // Available emoji reactions
-  const availableReactions = ['👍', '❤️', '😂', '😮', '🙏', '👏', '🤔'];
-  
-  // Toggle emoji reaction
-  const toggleReaction = (emoji: string) => {
-    if (reactions.includes(emoji)) {
-      setReactions(reactions.filter(r => r !== emoji));
-    } else {
-      setReactions([...reactions, emoji]);
-    }
-  };
   
   // Toggle reaction menu
   const [showReactionMenu, setShowReactionMenu] = useState(false);
@@ -63,9 +42,9 @@ const MessageItem: React.FC<MessageItemProps> = ({
         {/* Show name only if not consecutive */}
         {!isConsecutive && (
           <div className="text-xs font-medium text-neutral-500 dark:text-gray-400 mb-1 px-1 flex items-center">
-            {isUser ? 'You' : 'Neutrax'}
+            {isUser ? 'You' : 'Offline'}
             {!isUser && (
-              <span className="ml-2 bg-neutrax-green/20 dark:bg-neutrax-green/30 text-neutrax-accent dark:text-neutrax-light text-[10px] px-1.5 py-0.5 rounded-full">AI</span>
+              <span className="ml-2 bg-neutrax-green/20 dark:bg-neutrax-green/30 text-neutrax-accent dark:text-neutrax-light text-[10px] px-1.5 py-0.5 rounded-full">GPT</span>
             )}
           </div>
         )}
@@ -142,23 +121,14 @@ const MessageItem: React.FC<MessageItemProps> = ({
           )}
         </div>
         
-        {/* Typing indicator */}
-        {isTyping && !isUser && (
-          <div className="flex space-x-1 mt-2 px-3 py-2 bg-neutrax-light dark:bg-neutrax-green/10 rounded-bubble max-w-fit">
-            <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse"></div>
-            <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse delay-75"></div>
-            <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse delay-150"></div>
-          </div>
-        )}
-        
         {/* Reactions display */}
-        {reactions.length > 0 && (
+        {message.reactions && message.reactions.length > 0 && (
           <div className="flex mt-1 space-x-1">
-            {reactions.map((reaction, i) => (
+            {message.reactions.map((reaction, i) => (
               <span 
-                key={i} 
+                key={`${reaction}-${i}`} 
                 className="text-sm bg-neutral-100 dark:bg-gray-700 hover:bg-neutrax-light dark:hover:bg-neutrax-green/20 rounded-full px-2 py-0.5 transition-colors cursor-pointer"
-                onClick={() => toggleReaction(reaction)}
+                onClick={() => onToggleReaction && onToggleReaction(reaction)}
               >
                 {reaction}
               </span>
@@ -171,11 +141,11 @@ const MessageItem: React.FC<MessageItemProps> = ({
           {/* Like button */}
           <button 
             className={`p-1 rounded-full transition-colors ${
-              reactions.includes('👍') 
+              message.reactions && message.reactions.includes('👍') 
                 ? 'text-neutrax-green bg-neutrax-green/10' 
                 : 'text-neutral-400 dark:text-gray-500 hover:text-neutrax-green dark:hover:text-neutrax-green hover:bg-neutrax-green/10'
             }`}
-            onClick={() => toggleReaction('👍')}
+            onClick={() => onToggleReaction && onToggleReaction('👍')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
@@ -197,14 +167,16 @@ const MessageItem: React.FC<MessageItemProps> = ({
             {showReactionMenu && (
               <div className="absolute bottom-full mb-2 -left-2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-neutral-200 dark:border-gray-700 p-2 z-10">
                 <div className="flex space-x-1">
-                  {availableReactions.map((emoji, i) => (
+                  {AVAILABLE_REACTIONS.map((emoji, i) => (
                     <button 
                       key={i} 
                       className={`text-lg p-1 rounded-full hover:bg-neutrax-light dark:hover:bg-neutrax-green/20 transition-colors ${
-                        reactions.includes(emoji) ? 'bg-neutrax-light dark:bg-neutrax-green/20' : ''
+                        message.reactions && message.reactions.includes(emoji) 
+                          ? 'bg-neutrax-light dark:bg-neutrax-green/20' 
+                          : ''
                       }`}
                       onClick={() => {
-                        toggleReaction(emoji);
+                        onToggleReaction && onToggleReaction(emoji);
                         setShowReactionMenu(false);
                       }}
                     >
@@ -229,7 +201,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
         
         {/* Timestamp */}
         <div className="text-[10px] text-neutral-400 dark:text-gray-500 mt-1 px-1">
-          {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          {message.timestamp || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
         </div>
       </div>
     </div>

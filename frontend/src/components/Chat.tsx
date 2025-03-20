@@ -5,18 +5,18 @@ import MessageItem from './MessageItem';
 import ChatInput from './ChatInput';
 import ModelSelector from './ModelSelector';
 import ThemeToggle from './ThemeToggle';
-import { 
-  createWebSocketConnection, 
-  fetchConversationHistory, 
-  createNewConversation, 
-  sendMultimodalChatRequest 
+import useMessageReactions from '../hooks/useMessageReactions';
+import {
+  createWebSocketConnection,
+  fetchConversationHistory,
+  createNewConversation,
+  sendMultimodalChatRequest
 } from '../services/api';
 import Sidebar from './Sidebar';
 
 const LOADING_TIMEOUT = 30000; // 30 seconds timeout
 
 const Chat: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [selectedModel, setSelectedModel] = useState(() => {
@@ -27,7 +27,16 @@ const Chat: React.FC = () => {
     const savedId = localStorage.getItem('currentConversationId');
     return savedId || uuidv4();
   });
-  
+
+  // Use the reactions hook
+  const {
+    messages,
+    setMessages,
+    handleToggleReaction,
+    addMessage,
+    updateMessageContent
+  } = useMessageReactions([], conversationId);
+
   const ws = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,48 +46,48 @@ const Chat: React.FC = () => {
   // Initialize WebSocket connection handler
   const initializeWebSocket = useCallback(() => {
     if (!selectedModel) return null;
-    
+
     // Close existing connection if any
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       ws.current.close();
     }
-    
+
     const newWs = createWebSocketConnection();
-    
+
     newWs.onopen = () => {
       console.log('WebSocket connection established');
       setError(null);
     };
-    
+
     newWs.onerror = (error) => {
       console.error('WebSocket error:', error);
       setIsLoading(false);
       setIsTyping(false);
       setError('Failed to connect to the server. Please check your network connection.');
     };
-    
+
     newWs.onclose = (event) => {
       console.log('WebSocket connection closed:', event);
       setIsLoading(false);
       setIsTyping(false);
-      
+
       // Only set error if it wasn't a normal closure
       if (event.code !== 1000) {
         setError('Connection to server was lost. Please refresh the page.');
       }
     };
-    
+
     // WebSocket message handler
     newWs.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         if (data.error) {
           console.error('WebSocket error:', data.error);
           setIsLoading(false);
           setIsTyping(false);
           setError(`Server error: ${data.error}`);
-          
+
           // Clear the loading timeout
           if (loadingTimeoutRef.current) {
             clearTimeout(loadingTimeoutRef.current);
@@ -86,47 +95,42 @@ const Chat: React.FC = () => {
           }
           return;
         }
-        
+
         // Check for done flag - Ollama may send it in different ways
         const isDone = data.done === true || data.done === "true" || data.done === 1;
-        
+
         if (data.message && data.message.content) {
           // Show typing indicator on first chunk
           if (!isTyping) {
             setIsTyping(true);
           }
-          
-          setMessages(prevMessages => {
-            const lastMessage = prevMessages[prevMessages.length - 1];
-            
-            if (lastMessage && lastMessage.role === 'assistant') {
-              // For streaming, we need to APPEND the new content, not replace it
-              const updatedMessages = [...prevMessages];
-              updatedMessages[updatedMessages.length - 1] = {
-                ...lastMessage,
-                // Append the new content to the existing content
-                content: lastMessage.content + data.message.content,
-              };
-              return updatedMessages;
-            } else {
-              // If this is the first chunk, create a new message
-              return [
-                ...prevMessages,
-                {
-                  role: 'assistant',
-                  content: data.message.content,
-                  reactions: [],
-                },
-              ];
-            }
-          });
+
+          // Find the last assistant message
+          const lastAssistantIndex = messages.findIndex(m => m.role === 'assistant');
+
+          if (lastAssistantIndex >= 0) {
+            // Update existing message
+            const lastMessage = messages[lastAssistantIndex];
+            updateMessageContent(
+              lastAssistantIndex,
+              lastMessage.content + data.message.content
+            );
+          } else {
+            // Create new message
+            addMessage({
+              role: 'assistant',
+              content: data.message.content,
+              id: data.id || uuidv4(),
+              reactions: [],
+            });
+          }
         }
-        
+
         // Set loading to false when we receive the done flag
         if (isDone) {
           setIsLoading(false);
           setIsTyping(false);
-          
+
           // Clear the loading timeout
           if (loadingTimeoutRef.current) {
             clearTimeout(loadingTimeoutRef.current);
@@ -138,7 +142,7 @@ const Chat: React.FC = () => {
         setIsLoading(false);
         setIsTyping(false);
         setError('Failed to process server response. Please try again.');
-        
+
         // Clear the loading timeout
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current);
@@ -146,9 +150,9 @@ const Chat: React.FC = () => {
         }
       }
     };
-    
+
     return newWs;
-  }, [selectedModel]);
+  }, [selectedModel, messages, addMessage, updateMessageContent]);
 
   // Load conversation history when component mounts
   useEffect(() => {
@@ -156,9 +160,10 @@ const Chat: React.FC = () => {
       try {
         const response = await fetchConversationHistory(conversationId);
         if (response.messages && response.messages.length > 0) {
-          // Make sure all messages have a reactions array
+          // Make sure all messages have a reactions array and ID
           const messagesWithReactions = response.messages.map(msg => ({
             ...msg,
+            id: msg.id || uuidv4(),
             reactions: msg.reactions || [],
           }));
           setMessages(messagesWithReactions);
@@ -170,7 +175,7 @@ const Chat: React.FC = () => {
     };
 
     loadHistory();
-  }, [conversationId]);
+  }, [conversationId, setMessages]);
 
   // Initialize or reinitialize WebSocket when model changes
   useEffect(() => {
@@ -178,9 +183,9 @@ const Chat: React.FC = () => {
     if (selectedModel) {
       localStorage.setItem('selectedModel', selectedModel);
     }
-    
+
     ws.current = initializeWebSocket();
-    
+
     // Clean up WebSocket connection when component unmounts or model changes
     return () => {
       if (ws.current) {
@@ -203,33 +208,34 @@ const Chat: React.FC = () => {
   // Handler for sending messages
   const handleSendMessage = useCallback(async (content: string, imageBase64?: string) => {
     if (!content.trim() && !imageBase64) return;
-    
+
     if (!selectedModel) {
       setError('Please select a model first');
       return;
     }
-    
+
     // Clear any previous errors
     setError(null);
-    
+
     // Create user message for display
     const userMessage: Message = {
       role: 'user',
-      content: imageBase64 
-        ? `${content} [Image attached]` 
+      content: imageBase64
+        ? `${content} [Image attached]`
         : content,
+      id: uuidv4(),
       reactions: [],
     };
-    
+
     // Add to messages for display
-    setMessages(prevMessages => [...prevMessages, userMessage]);
+    addMessage(userMessage);
     setIsLoading(true);
-    
+
     // Clear any existing timeout
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
     }
-    
+
     // Set a timeout to reset loading state in case of issues
     loadingTimeoutRef.current = window.setTimeout(() => {
       setIsLoading(false);
@@ -237,17 +243,17 @@ const Chat: React.FC = () => {
       setError('Request timed out. Please try again.');
       loadingTimeoutRef.current = null;
     }, LOADING_TIMEOUT);
-    
+
     // Save conversation ID to localStorage
     localStorage.setItem('currentConversationId', conversationId);
-    
+
     try {
       if (imageBase64) {
         // For multimodal messages, use the REST API
-        
+
         // Create content parts
         const contentParts: ContentPart[] = [];
-        
+
         // Add text if provided
         if (content.trim()) {
           contentParts.push({
@@ -255,7 +261,7 @@ const Chat: React.FC = () => {
             text: content
           });
         }
-        
+
         // Add image
         contentParts.push({
           type: 'image_url',
@@ -263,7 +269,7 @@ const Chat: React.FC = () => {
             url: `data:image/jpeg;base64,${imageBase64}`
           }
         });
-        
+
         // Prepare multimodal message format for the API
         const multimodalMessages: MultimodalMessage[] = messages.map(msg => {
           // Convert regular messages to multimodal format
@@ -275,31 +281,30 @@ const Chat: React.FC = () => {
             }]
           };
         });
-        
+
         // Add the new user message in multimodal format
         multimodalMessages.push({
           role: 'user',
           content: contentParts
         });
-        
+
         // Send multimodal request
         const response = await sendMultimodalChatRequest({
           model: selectedModel,
           messages: multimodalMessages,
           conversation_id: conversationId
         });
-        
+
         // Handle the response
-        setMessages(prevMessages => [
-          ...prevMessages,
-          {
-            role: 'assistant',
-            content: response.message.content,
-            reactions: [],
-          }
-        ]);
+        addMessage({
+          role: 'assistant',
+          content: response.message.content,
+          id: response.message.id || uuidv4(),
+          reactions: [],
+        });
+
         setIsLoading(false);
-        
+
         // Clear the loading timeout
         if (loadingTimeoutRef.current) {
           clearTimeout(loadingTimeoutRef.current);
@@ -310,19 +315,19 @@ const Chat: React.FC = () => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
           const payload = {
             model: selectedModel,
-            messages: [...messages, userMessage],
+            messages: messages,
             conversation_id: conversationId,
           };
           ws.current.send(JSON.stringify(payload));
         } else {
           // If WebSocket is not connected, try to reconnect
           ws.current = initializeWebSocket();
-          
+
           setTimeout(() => {
             if (ws.current && ws.current.readyState === WebSocket.OPEN) {
               const payload = {
                 model: selectedModel,
-                messages: [...messages, userMessage],
+                messages: messages,
                 conversation_id: conversationId,
               };
               ws.current.send(JSON.stringify(payload));
@@ -337,14 +342,14 @@ const Chat: React.FC = () => {
       setIsLoading(false);
       setIsTyping(false);
       setError('Failed to send message. Please try again.');
-      
+
       // Clear the loading timeout
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
         loadingTimeoutRef.current = null;
       }
     }
-  }, [conversationId, initializeWebSocket, messages, selectedModel]);
+  }, [conversationId, initializeWebSocket, messages, selectedModel, addMessage]);
 
   // Handler for clearing chat
   const handleClearChat = useCallback(() => {
@@ -354,71 +359,72 @@ const Chat: React.FC = () => {
     setConversationId(newId);
     localStorage.setItem('currentConversationId', newId);
     setError(null);
-  }, []);
+  }, [setMessages]);
 
   // Handler for creating a new chat
   const handleNewChat = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // Close any existing WebSocket connection
       if (ws.current) {
         ws.current.close();
       }
-      
+
       // Create a new conversation
       const response = await createNewConversation();
       const newId = response.conversation_id;
-      
+
       // Update state
       setConversationId(newId);
       setMessages([]);
       localStorage.setItem('currentConversationId', newId);
-      
+
       // Reconnect WebSocket
       ws.current = initializeWebSocket();
-      
+
       // Close sidebar on mobile
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
       }
-      
+
       setIsLoading(false);
     } catch (error) {
       console.error('Error creating new conversation:', error);
       setError('Failed to create a new conversation');
       setIsLoading(false);
     }
-  }, [initializeWebSocket]);
+  }, [initializeWebSocket, setMessages]);
 
   // Handler for selecting a conversation
   const handleSelectConversation = useCallback(async (id: string) => {
     if (id === conversationId) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // Close any existing WebSocket connection
       if (ws.current) {
         ws.current.close();
       }
-      
+
       // Update state
       setConversationId(id);
       localStorage.setItem('currentConversationId', id);
-      
+
       // Load conversation history
       const response = await fetchConversationHistory(id);
       if (response.messages && response.messages.length > 0) {
-        // Make sure all messages have a reactions array
+        // Make sure all messages have a reactions array and ID
         const messagesWithReactions = response.messages.map(msg => ({
           ...msg,
+          id: msg.id || uuidv4(),
           reactions: msg.reactions || [],
         }));
         setMessages(messagesWithReactions);
-        
+
         // Scroll to bottom after messages load
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -426,39 +432,39 @@ const Chat: React.FC = () => {
       } else {
         setMessages([]);
       }
-      
+
       // Reconnect WebSocket
       ws.current = initializeWebSocket();
-      
+
       // Close sidebar on mobile
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
       }
-      
+
       setIsLoading(false);
     } catch (error) {
       console.error('Error loading conversation:', error);
       setError('Failed to load conversation');
       setIsLoading(false);
     }
-  }, [conversationId, initializeWebSocket]);
+  }, [conversationId, initializeWebSocket, setMessages]);
 
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 text-neutral-900 dark:text-white">
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''} bg-sidebar dark:bg-gray-800 text-white`}>
         <div className="flex flex-col h-full">
-          {/* New Chat Button */}
+          {/* App Header */}
           <div className="p-3 flex items-center justify-between">
             <h1 className="text-xl font-bold text-white flex items-center">
               <span className="bg-neutrax-green text-white h-8 w-8 flex items-center justify-center rounded-md mr-2 text-sm font-bold">NT</span>
-              NeutraxGPT
+              OfflineGPT
             </h1>
           </div>
-          
+
           {/* New Chat button */}
           <div className="p-3">
-            <button 
+            <button
               onClick={handleNewChat}
               className="w-full flex items-center justify-center gap-2 bg-neutrax-green hover:bg-neutrax-green/90 text-white py-2.5 px-4 rounded-lg transition-colors font-medium"
             >
@@ -470,12 +476,12 @@ const Chat: React.FC = () => {
           </div>
 
           {/* Conversation list */}
-          <Sidebar 
+          <Sidebar
             currentConversationId={conversationId}
             onSelectConversation={handleSelectConversation}
             onNewChat={handleNewChat}
           />
-          
+
           {/* Bottom section with settings */}
           <div className="mt-auto border-t border-sidebar-700 p-2">
             <div className="flex items-center justify-between px-3 py-2">
@@ -493,9 +499,8 @@ const Chat: React.FC = () => {
           </div>
         </div>
       </div>
-      
-      {/* Sidebar overlay (mobile) */}
-      <div 
+{/* Sidebar overlay (mobile) */}
+<div 
         className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''} bg-black/50 backdrop-blur-sm`}
         onClick={() => setSidebarOpen(false)}
       ></div>
@@ -552,7 +557,7 @@ const Chat: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to NeutraxGPT</h2>
+                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to OfflineGPT</h2>
                 <p className="text-neutral-700 dark:text-gray-300 mb-6">
                   Start a conversation with your local AI assistant. Ask questions, get creative, or discuss ideas.
                 </p>
@@ -570,18 +575,19 @@ const Chat: React.FC = () => {
             <div className="max-w-4xl mx-auto">
               {messages.map((message, index) => (
                 <MessageItem 
-                  key={index} 
+                  key={message.id || index} 
                   message={message}
                   isConsecutive={index > 0 && messages[index - 1].role === message.role}
                   index={index}
                   messages={messages}
+                  onToggleReaction={(emoji) => handleToggleReaction(index, emoji)}
                 />
               ))}
               
               {isTyping && (
                 <div className="flex mb-6">
                   <div className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-gradient-to-br from-neutrax-green to-neutrax-green/90 mr-3 ring-1 ring-neutrax-green/30 shadow-sm">
-                    <div className="text-white h-6 w-6 flex items-center justify-center text-xs font-bold drop-shadow-sm">NT</div>
+                    <div className="text-white h-6 w-6 flex items-center justify-center text-xs font-bold drop-shadow-sm">OfflineGPT</div>
                   </div>
                   <div className="flex space-x-1 mt-2 px-3 py-2 bg-neutrax-light dark:bg-neutrax-green/10 rounded-bubble animate-fadeIn">
                     <div className="w-2 h-2 bg-neutrax-green rounded-full animate-pulse"></div>
@@ -607,10 +613,10 @@ const Chat: React.FC = () => {
             <ChatInput 
               onSendMessage={handleSendMessage} 
               disabled={isLoading || !selectedModel}
-              placeholder="Ask to NeutraxGPT..."
+              placeholder="Ask to OfflineGPT..."
             />
             <div className="mt-2 text-xs text-neutral-500 dark:text-gray-400 text-center">
-              Running on local models. Powered by NeutraxGPT v1.0.0
+              Running on local models. Powered by OfflineGPT v1.0.0
             </div>
           </div>
         </div>

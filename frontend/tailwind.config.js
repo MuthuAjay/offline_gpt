@@ -12,14 +12,6 @@ export default {
           DEFAULT: '#68E365', // Our main green color
           dark: '#58ce56', // Darker version
         },
-        // Adding Neutrax colors
-        neutrax: {
-          green: '#8cc840',      // Main Neutrax green for avatar
-          light: '#f6f9f1',      // Light mint for message backgrounds
-          border: '#e5edd8',     // Subtle border color
-          hover: '#e9f4d8',      // Hover state color
-          accent: '#5a8428',     // Darker green for accents
-        },
         neutral: {
           50: '#F9FAFB',
           100: '#F3F4F6',
@@ -49,6 +41,12 @@ export default {
           700: '#374151',
           800: '#1F2937',
           900: '#111827',
+        },
+        neutrax: {
+          green: '#68E365',
+          light: '#F0F9EF',
+          accent: '#359433',
+          border: '#DDF6DC',
         },
       },
       borderRadius: {
@@ -181,8 +179,8 @@ export default {
         },
       }),
       boxShadow: {
-        'message': '0 2px 5px 0 rgba(0, 0, 0, 0.05)',
-        'message-hover': '0 4px 12px 0 rgba(0, 0, 0, 0.08)',
+        'message': '0 1px 3px rgba(0, 0, 0, 0.05)',
+        'message-hover': '0 2px 5px rgba(0, 0, 0, 0.08)',
       },
     },
   },
