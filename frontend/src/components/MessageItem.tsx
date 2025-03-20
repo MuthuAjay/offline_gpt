@@ -31,7 +31,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
             </svg>
           ) : (
             <div className="text-white h-6 w-6 flex items-center justify-center text-xs font-bold drop-shadow-sm">
-              NT
+              GPT
             </div>
           )}
         </div>
