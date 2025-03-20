@@ -1,102 +1,160 @@
 import React, { useState, useEffect } from 'react';
 import { fetchModels } from '../services/api';
 
+interface ModelDetails {
+  // Define specific properties if known
+  parameters?: Record<string, any>;
+  architecture?: string;
+  // Add other known properties
+}
+
 interface Model {
   name: string;
   model: string;
   modified_at: string;
   size: number;
   digest: string;
-  details: any;
+  details: ModelDetails;
 }
 
 interface ModelSelectorProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
+  // Add default model option if needed
+  defaultModel?: string;
 }
 
 const ModelSelector: React.FC<ModelSelectorProps> = ({ 
   selectedModel, 
-  onModelChange 
+  onModelChange,
+  defaultModel
 }) => {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetchModels();
-        console.log('API Response:', response); // Debug log
-        
-        // Check if response exists and has models property
-        if (!response || !response.models) {
-          console.error('Invalid response format:', response);
-          throw new Error('Invalid response format from server');
-        }
-        
-        // Transform the response if needed
-        const modelList = response.models.map(model => ({
+  const loadModels = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setIsRetrying(false);
+      
+      console.log('Fetching models...'); // Debug log
+      const response = await fetchModels();
+      console.log('Raw API Response:', response); // Debug log
+      
+      if (!response) {
+        throw new Error('No response received from server');
+      }
+
+      if (!Array.isArray(response.models)) {
+        console.error('Invalid response structure:', response);
+        throw new Error('Server response does not contain models array');
+      }
+      
+      const modelList = response.models.map((model: any) => {
+        console.log('Processing model:', model); // Debug log
+        return {
           name: model.name || model.model || 'Unknown Model',
-          model: model.model || model.name || 'unknown',
-          modified_at: model.modified_at || '',
-          size: model.size || 0,
+          model: model.model || model.name || `unknown-${Math.random().toString(36).substring(2, 9)}`,
+          modified_at: model.modified_at || new Date().toISOString(),
+          size: typeof model.size === 'number' ? model.size : 0,
           digest: model.digest || '',
           details: model.details || {}
-        }));
-        
-        console.log('Transformed models:', modelList); // Debug log
-        setModels(modelList);
-      } catch (error) {
-        console.error('Error loading models:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load models');
-      } finally {
-        setLoading(false);
+        };
+      });
+      
+      console.log('Processed models:', modelList); // Debug log
+      setModels(modelList);
+      
+      // If no model is selected and we have models, select default or first
+      if ((!selectedModel || selectedModel === '') && modelList.length > 0) {
+        const modelToSelect = defaultModel && modelList.find(m => m.model === defaultModel || m.name === defaultModel)
+          ? defaultModel
+          : modelList[0].model;
+        onModelChange(modelToSelect);
       }
-    };
+    } catch (error) {
+      console.error('Detailed error:', error); // Debug log
+      const errorMessage = error instanceof Error
+        ? `Failed to load models: ${error.message}`
+        : 'An unknown error occurred while loading models';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div className="relative">
-      <select
-        value={selectedModel}
-        onChange={(e) => onModelChange(e.target.value)}
-        className="appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 cursor-pointer"
-        disabled={loading}
-      >
-        <option value="">Select a model</option>
-        {models.map((model) => (
-          <option key={model.name} value={model.name}>
-            {model.name}
-          </option>
-        ))}
-      </select>
-      
-      {/* Custom dropdown arrow */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
-        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-          <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-        </svg>
-      </div>
+  const handleRetry = () => {
+    setIsRetrying(true);
+    loadModels();
+  };
 
-      {/* Loading state */}
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-700 rounded-lg">
-          <svg className="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  return (
+    <div className="w-full">
+      <div className="relative">
+        <select
+          value={selectedModel}
+          onChange={(e) => onModelChange(e.target.value)}
+          className={`w-full appearance-none bg-white dark:bg-gray-700 border ${
+            error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+          } rounded-lg px-4 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 ${
+            loading ? 'text-gray-400 cursor-not-allowed' : 'cursor-pointer'
+          }`}
+          disabled={loading}
+          aria-label="Select a model"
+        >
+          <option value="">Select a model</option>
+          {models.map((model) => (
+            <option key={`${model.model}-${model.digest}`} value={model.model}>
+              {model.name}
+            </option>
+          ))}
+        </select>
+        
+        {/* Custom dropdown arrow */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+          <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
           </svg>
         </div>
-      )}
 
-      {/* Error state */}
+        {/* Loading indicator next to select instead of overlaying */}
+        {loading && (
+          <div className="absolute right-8 inset-y-0 flex items-center">
+            <svg className="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </div>
+        )}
+      </div>
+
+      {/* Error state with retry button */}
       {error && (
-        <div className="absolute top-full left-0 mt-1 text-xs text-red-600 dark:text-red-400">
-          {error}
+        <div className="mt-1 flex items-center text-xs text-red-600 dark:text-red-400">
+          <span>{error}</span>
+          <button
+            onClick={handleRetry}
+            disabled={isRetrying}
+            className="ml-2 px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs hover:bg-gray-300 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            aria-label="Retry loading models"
+          >
+            {isRetrying ? 'Retrying...' : 'Retry'}
+          </button>
+        </div>
+      )}
+      
+      {/* No models available message */}
+      {!loading && !error && models.length === 0 && (
+        <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+          No models available. Please check your connection or try again later.
         </div>
       )}
     </div>
