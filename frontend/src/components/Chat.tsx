@@ -563,7 +563,7 @@ const Chat: React.FC = () => {
           <div className="p-3 flex items-center justify-between">
             <h1 className="text-xl font-bold text-white flex items-center">
               <span className="bg-neutrax-green text-white h-8 w-8 flex items-center justify-center rounded-md mr-2 text-sm font-bold">NT</span>
-              NeutraxGPT
+              OfflineGPT
             </h1>
           </div>
           
@@ -666,7 +666,7 @@ const Chat: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to NeutraxGPT</h2>
+                <h2 className="text-2xl font-bold mb-3 text-neutral-900 dark:text-white">Welcome to OfflineGPT</h2>
                 <p className="text-neutral-700 dark:text-gray-300 mb-6">
                   Start a conversation with your local AI assistant. Ask questions, get creative, or discuss ideas.
                 </p>
@@ -726,10 +726,10 @@ const Chat: React.FC = () => {
             <ChatInput 
               onSendMessage={handleSendMessage} 
               disabled={isLoading || !selectedModel}
-              placeholder="Ask to NeutraxGPT..."
+              placeholder="Ask to OfflineGPT anything...."
             />
             <div className="mt-2 text-xs text-neutral-500 dark:text-gray-400 text-center">
-              Running on local models. Powered by NeutraxGPT v1.0.0
+              Running on local models. Powered by OfflineGPT v1.0.0
             </div>
           </div>
         </div>
