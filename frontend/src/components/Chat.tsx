@@ -5,7 +5,6 @@ import MessageItem from './MessageItem';
 import ChatInput from './ChatInput';
 import ModelSelector from './ModelSelector';
 import ThemeToggle from './ThemeToggle';
-import SearchToggle from './SearchToggle'; // We'll create this component
 import { 
   createWebSocketConnection, 
   createEnhancedWebSocketConnection,
@@ -525,12 +524,6 @@ const Chat: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-3">
-              {/* Web search toggle */}
-              <SearchToggle 
-                enabled={useWebSearch}
-                onToggle={toggleWebSearch}
-              />
-              
               {/* Model selector */}
               <ModelSelector 
                 selectedModel={selectedModel} 
@@ -582,16 +575,16 @@ const Chat: React.FC = () => {
                 />
               ))}
               {isLoading && (
-                <div className="my-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <div className="search-status my-4">
                   {searchStatus ? (
                     <div className="flex items-center">
-                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-indigo-500 rounded-full border-t-transparent"></div>
-                      <div className="text-sm text-gray-700 dark:text-gray-300">{searchStatus}</div>
+                      <div className="search-status-spinner"></div>
+                      <div className="text-sm">{searchStatus}</div>
                     </div>
                   ) : (
-                    <div className="flex items-center animate-pulse">
-                      <div className="h-4 w-4 mr-2 rounded-full bg-indigo-400 dark:bg-indigo-600"></div>
-                      <div className="h-4 flex-grow rounded bg-gray-300 dark:bg-gray-600"></div>
+                    <div className="flex items-center">
+                      <div className="search-status-spinner"></div>
+                      <div className="text-sm">Processing your request...</div>
                     </div>
                   )}
                 </div>
@@ -620,6 +613,8 @@ const Chat: React.FC = () => {
                     : "Type your message..."
               }
               showSearchInput={useWebSearch}
+              webSearchEnabled={useWebSearch}
+              onToggleWebSearch={toggleWebSearch}
             />
             {useWebSearch && !isLoading && (
               <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">

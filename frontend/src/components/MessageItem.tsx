@@ -37,6 +37,16 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled = fa
       .replace(/(According to .*?)(?=\n\n|\n##|\n###|$)/gs, '$1{.search-source-citation}');
   };
 
+  // Detect if content contains search results for specific styling
+  const isSearchResults = 
+    !isUser && 
+    isSearchEnabled && 
+    (message.content.includes("Search results:") || 
+     message.content.includes("I found") || 
+     message.content.includes("According to") ||
+     message.content.match(/\[(\d+)\]:/g) || 
+     message.content.match(/\(https?:\/\/[^\s)]+\)/g));
+
   return (
     <div className={`message ${isUser ? 'message-user' : 'message-assistant'} mb-4`}>
       <div className="flex items-start gap-3">
@@ -62,8 +72,11 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled = fa
           <div className="text-sm font-medium mb-1 flex items-center gap-2">
             {isUser ? 'You' : 'Assistant'}
             
-            {!isUser && isSearchEnabled && (
-              <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded-full">
+            {!isUser && isSearchEnabled && isSearchResults && (
+              <span className="web-search-indicator">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
                 Web Search
               </span>
             )}
@@ -71,7 +84,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled = fa
           
           <div className={`prose dark:prose-invert max-w-none ${
             // Add special styling if this is a message with search results
-            (!isUser && isSearchEnabled) ? 'search-enhanced-content' : ''
+            (isSearchResults) ? 'search-enhanced-content' : ''
           }`}>
             <ReactMarkdown>
               {isSearchEnabled && !isUser 

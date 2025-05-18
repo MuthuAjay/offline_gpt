@@ -6,13 +6,17 @@ interface ChatInputProps {
   disabled: boolean;
   placeholder?: string;
   showSearchInput?: boolean;
+  webSearchEnabled?: boolean;
+  onToggleWebSearch?: () => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   disabled,
   placeholder = "Type your message...",
-  showSearchInput = false
+  showSearchInput = false,
+  webSearchEnabled = false,
+  onToggleWebSearch
 }) => {
   const [message, setMessage] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -82,15 +86,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
     <div className="flex flex-col w-full">
       {/* Custom search input */}
       {showSearchInput && showCustomSearch && (
-        <div className="mb-2 flex items-center bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg">
-          <div className="flex-grow flex items-center">
+        <div className="web-search-input-container custom-search-input-container mb-2">
+          <div className="flex items-center px-3 py-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input 
               type="text"
               ref={searchInputRef}
-              className="flex-grow bg-transparent border-none focus:ring-0 text-sm text-blue-700 dark:text-blue-300 placeholder-blue-400 dark:placeholder-blue-500"
+              className="web-search-input flex-grow"
               placeholder="Custom search query (optional)"
               value={customSearchQuery}
               onChange={handleSearchInputChange}
@@ -122,10 +126,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
       )}
       
       {/* Main input area */}
-      <div className="flex items-end border rounded-lg bg-white dark:bg-gray-700 p-2 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-opacity-50 transition">
+      <div className="chat-input-container">
         <textarea
           ref={textareaRef}
-          className="flex-grow px-3 py-2 bg-transparent outline-none resize-none dark:text-white min-h-[50px]"
+          className="chat-input"
           placeholder={placeholder}
           rows={1}
           value={message}
@@ -136,22 +140,49 @@ const ChatInput: React.FC<ChatInputProps> = ({
           disabled={disabled}
           aria-label="Message input"
         />
-        <div className="flex items-center">
-          {/* Search toggle button (only visible when web search is enabled) */}
-          {showSearchInput && (
+        <div className="chat-input-actions">
+          {/* Web search toggle button */}
+          {onToggleWebSearch && (
             <button
               type="button"
-              className={`p-2 rounded-full mr-1 ${
-                showCustomSearch
-                  ? 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' 
-                  : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-blue-400 dark:hover:bg-gray-700'
-              }`}
+              onClick={onToggleWebSearch}
+              className={`chat-input-button web-search-toggle ${webSearchEnabled ? 'active' : ''}`}
+              title={webSearchEnabled ? "Disable web search" : "Enable web search"}
+              aria-label={webSearchEnabled ? "Web search enabled" : "Web search disabled"}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="h-5 w-5" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                />
+              </svg>
+            </button>
+          )}
+          
+          {/* Custom search query toggle - only visible when web search is enabled */}
+          {showSearchInput && webSearchEnabled && (
+            <button
+              type="button"
+              className={`chat-input-button ${showCustomSearch ? 'active' : ''}`}
               onClick={toggleCustomSearch}
               title={showCustomSearch ? "Hide search options" : "Show search options"}
               disabled={disabled}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                {showCustomSearch ? (
+                  <path fillRule="evenodd" d="M4 8a1 1 0 011-1h2a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
+                ) : (
+                  <path fillRule="evenodd" d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z" clipRule="evenodd" />
+                )}
               </svg>
             </button>
           )}
@@ -162,7 +193,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           {/* Send button */}
           <button
             type="button"
-            className="ml-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="send-button"
             onClick={handleSendMessage}
             disabled={(!message.trim() && !imageBase64) || disabled}
             aria-label="Send message"
@@ -171,6 +202,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* Web search indicator */}
+      {webSearchEnabled && !disabled && (
+        <div className="web-search-badge mt-2 ml-1">
+          <span className="dot"></span>
+          <span>Web search enabled</span>
+        </div>
+      )}
       
       {/* Status message */}
       {disabled && (
