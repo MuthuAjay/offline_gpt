@@ -9,6 +9,70 @@ export interface BaseContentPart {
   type: ContentType;
 }
 
+// Add these types to your existing types.ts file
+
+/**
+ * Web search result interface
+ */
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  published_date?: string;
+}
+
+/**
+ * Web search request interface
+ */
+export interface WebSearchRequest {
+  query: string;
+  num_results?: number;
+}
+
+/**
+ * Web search response interface
+ */
+export interface WebSearchResponse {
+  results: WebSearchResult[];
+}
+
+/**
+ * Web fetch request interface
+ */
+export interface WebFetchRequest {
+  url: string;
+}
+
+/**
+ * Web fetch response interface
+ */
+export interface WebFetchResponse {
+  url: string;
+  title: string;
+  text: string;
+  main_content: string;
+  status_code: number;
+  error?: string;
+}
+
+/**
+ * Enhanced chat request interface with web search capability
+ */
+export interface EnhancedChatRequest extends ChatRequest {
+  use_web_search: boolean;
+  web_search_query?: string;
+}
+
+/**
+ * Web search status update (for WebSocket)
+ */
+export interface WebSearchStatusUpdate {
+  status: 'searching' | 'search_complete' | 'generating' | 'search_error';
+  message?: string;
+  results_count?: number;
+  error?: string;
+}
+
 export interface TextContent extends BaseContentPart {
   type: 'text';
   text: string;

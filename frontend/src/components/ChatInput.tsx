@@ -1,29 +1,44 @@
-import React, { useState, KeyboardEvent } from 'react';
+import React, { useState, KeyboardEvent, useRef } from 'react';
 import ImageUploader from './ImageUploader';
 
 interface ChatInputProps {
-  onSendMessage: (message: string, imageBase64?: string) => void;
+  onSendMessage: (message: string, imageBase64?: string, customSearchQuery?: string) => void;
   disabled: boolean;
   placeholder?: string;
+  showSearchInput?: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ 
-  onSendMessage, 
-  disabled, 
-  placeholder = "Type your message..."
+const ChatInput: React.FC<ChatInputProps> = ({
+  onSendMessage,
+  disabled,
+  placeholder = "Type your message...",
+  showSearchInput = false
 }) => {
   const [message, setMessage] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isComposing, setIsComposing] = useState(false);
+  const [customSearchQuery, setCustomSearchQuery] = useState('');
+  const [showCustomSearch, setShowCustomSearch] = useState(false);
+  
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const handleSendMessage = () => {
     if ((message.trim() || imageBase64) && !disabled) {
-      onSendMessage(message, imageBase64 || undefined);
+      // Pass the custom search query if it's enabled and not empty
+      const searchQuery = (showSearchInput && showCustomSearch && customSearchQuery.trim()) 
+        ? customSearchQuery.trim() 
+        : undefined;
+        
+      onSendMessage(message, imageBase64 || undefined, searchQuery);
       setMessage('');
       setImageBase64(null);
+      
+      // Don't clear the custom search query after sending
+      // so users can use the same search query for multiple messages
     }
   };
-
+  
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (isComposing) return;
     
@@ -40,18 +55,57 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const textarea = e.target;
     setMessage(textarea.value);
-    
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
   };
 
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomSearchQuery(e.target.value);
+  };
+
+  const toggleCustomSearch = () => {
+    setShowCustomSearch(!showCustomSearch);
+    // Focus the search input when it becomes visible
+    if (!showCustomSearch) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 0);
+    } else {
+      // Focus back on the main textarea when hiding search
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full">
+      {/* Custom search input */}
+      {showSearchInput && showCustomSearch && (
+        <div className="mb-2 flex items-center bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg">
+          <div className="flex-grow flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input 
+              type="text"
+              ref={searchInputRef}
+              className="flex-grow bg-transparent border-none focus:ring-0 text-sm text-blue-700 dark:text-blue-300 placeholder-blue-400 dark:placeholder-blue-500"
+              placeholder="Custom search query (optional)"
+              value={customSearchQuery}
+              onChange={handleSearchInputChange}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Image preview */}
       {imageBase64 && (
         <div className="mb-2 relative">
-          <img 
-            src={`data:image/jpeg;base64,${imageBase64}`} 
-            alt="Uploaded" 
+          <img
+            src={`data:image/jpeg;base64,${imageBase64}`}
+            alt="Uploaded"
             className="h-20 rounded-md object-cover"
           />
           <button
@@ -66,8 +120,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         </div>
       )}
+      
+      {/* Main input area */}
       <div className="flex items-end border rounded-lg bg-white dark:bg-gray-700 p-2 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-opacity-50 transition">
         <textarea
+          ref={textareaRef}
           className="flex-grow px-3 py-2 bg-transparent outline-none resize-none dark:text-white min-h-[50px]"
           placeholder={placeholder}
           rows={1}
@@ -80,7 +137,29 @@ const ChatInput: React.FC<ChatInputProps> = ({
           aria-label="Message input"
         />
         <div className="flex items-center">
+          {/* Search toggle button (only visible when web search is enabled) */}
+          {showSearchInput && (
+            <button
+              type="button"
+              className={`p-2 rounded-full mr-1 ${
+                showCustomSearch
+                  ? 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' 
+                  : 'text-gray-500 hover:text-blue-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-blue-400 dark:hover:bg-gray-700'
+              }`}
+              onClick={toggleCustomSearch}
+              title={showCustomSearch ? "Hide search options" : "Show search options"}
+              disabled={disabled}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          )}
+          
+          {/* Image uploader */}
           <ImageUploader onImageUploaded={handleImageUploaded} disabled={disabled} />
+          
+          {/* Send button */}
           <button
             type="button"
             className="ml-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
@@ -92,6 +171,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* Status message */}
       {disabled && (
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-2">
           {message.trim() || imageBase64 ? "Processing your request..." : ""}

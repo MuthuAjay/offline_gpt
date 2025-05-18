@@ -5,11 +5,14 @@ import MessageItem from './MessageItem';
 import ChatInput from './ChatInput';
 import ModelSelector from './ModelSelector';
 import ThemeToggle from './ThemeToggle';
+import SearchToggle from './SearchToggle'; // We'll create this component
 import { 
   createWebSocketConnection, 
+  createEnhancedWebSocketConnection,
   fetchConversationHistory, 
   createNewConversation, 
-  sendMultimodalChatRequest 
+  sendMultimodalChatRequest, 
+  webSearch
 } from '../services/api';
 import Sidebar from './Sidebar';
 
@@ -27,6 +30,12 @@ const Chat: React.FC = () => {
     return savedId || uuidv4();
   });
   
+  // Web search related state
+  const [useWebSearch, setUseWebSearch] = useState(() => {
+    return localStorage.getItem('useWebSearch') === 'true';
+  });
+  const [searchStatus, setSearchStatus] = useState<string>('');
+  
   const ws = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,7 +51,8 @@ const Chat: React.FC = () => {
       ws.current.close();
     }
     
-    const newWs = createWebSocketConnection();
+    // Use enhanced WebSocket if web search is enabled
+    const newWs = useWebSearch ? createEnhancedWebSocketConnection() : createWebSocketConnection();
     
     newWs.onopen = () => {
       console.log('WebSocket connection established');
@@ -83,6 +93,28 @@ const Chat: React.FC = () => {
           return;
         }
         
+        // Handle web search status updates
+        if (data.status) {
+          if (data.status === 'searching') {
+            setSearchStatus(`Searching the web for: ${data.message?.split(':')[1] || 'information'}`);
+          } 
+          else if (data.status === 'search_complete') {
+            if (data.results_count && data.results_count > 0) {
+              setSearchStatus(`Found ${data.results_count} results. Generating response...`);
+            } else {
+              setSearchStatus('No search results found. Using model knowledge...');
+            }
+          }
+          else if (data.status === 'generating') {
+            setSearchStatus('Generating response...');
+          }
+          else if (data.status === 'search_error') {
+            setSearchStatus(`Search error: ${data.error || 'Unknown error'}`);
+            setError(`Search error: ${data.error || 'Unknown error'}`);
+          }
+          return;
+        }
+        
         // Check for done flag - Ollama may send it in different ways
         const isDone = data.done === true || data.done === "true" || data.done === 1;
         
@@ -115,6 +147,7 @@ const Chat: React.FC = () => {
         // Set loading to false when we receive the done flag
         if (isDone) {
           setIsLoading(false);
+          setSearchStatus('');
           
           // Clear the loading timeout
           if (loadingTimeoutRef.current) {
@@ -136,7 +169,12 @@ const Chat: React.FC = () => {
     };
     
     return newWs;
-  }, [selectedModel]);
+  }, [selectedModel, useWebSearch]);
+
+  // Save web search preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('useWebSearch', useWebSearch.toString());
+  }, [useWebSearch]);
 
   // Load conversation history when component mounts
   useEffect(() => {
@@ -155,7 +193,7 @@ const Chat: React.FC = () => {
     loadHistory();
   }, [conversationId]);
 
-  // Initialize or reinitialize WebSocket when model changes
+  // Initialize or reinitialize WebSocket when model changes or web search setting changes
   useEffect(() => {
     // Save selected model to localStorage
     if (selectedModel) {
@@ -176,7 +214,7 @@ const Chat: React.FC = () => {
         loadingTimeoutRef.current = null;
       }
     };
-  }, [selectedModel, initializeWebSocket]);
+  }, [selectedModel, useWebSearch, initializeWebSocket]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -184,7 +222,7 @@ const Chat: React.FC = () => {
   }, [messages]);
 
   // Handler for sending messages
-  const handleSendMessage = useCallback(async (content: string, imageBase64?: string) => {
+  const handleSendMessage = useCallback(async (content: string, imageBase64?: string, customSearchQuery?: string) => {
     if (!content.trim() && !imageBase64) return;
     
     if (!selectedModel) {
@@ -293,6 +331,18 @@ const Chat: React.FC = () => {
             messages: [...messages, userMessage],
             conversation_id: conversationId,
           };
+          
+          // Add web search parameters if enabled
+          if (useWebSearch) {
+            Object.assign(payload, {
+              use_web_search: true,
+              web_search_query: customSearchQuery || content
+            });
+            
+            // Update search status
+            setSearchStatus('Preparing to search...');
+          }
+          
           ws.current.send(JSON.stringify(payload));
         } else {
           // If WebSocket is not connected, try to reconnect
@@ -305,6 +355,18 @@ const Chat: React.FC = () => {
                 messages: [...messages, userMessage],
                 conversation_id: conversationId,
               };
+              
+              // Add web search parameters if enabled
+              if (useWebSearch) {
+                Object.assign(payload, {
+                  use_web_search: true,
+                  web_search_query: customSearchQuery || content
+                });
+                
+                // Update search status
+                setSearchStatus('Preparing to search...');
+              }
+              
               ws.current.send(JSON.stringify(payload));
             } else {
               throw new Error('WebSocket connection failed');
@@ -323,7 +385,7 @@ const Chat: React.FC = () => {
         loadingTimeoutRef.current = null;
       }
     }
-  }, [conversationId, initializeWebSocket, messages, selectedModel]);
+  }, [conversationId, initializeWebSocket, messages, selectedModel, useWebSearch]);
 
   // Handler for clearing chat
   const handleClearChat = useCallback(() => {
@@ -417,31 +479,19 @@ const Chat: React.FC = () => {
     }
   }, [conversationId, initializeWebSocket]);
 
+  // Toggle web search feature
+  const toggleWebSearch = useCallback(() => {
+    setUseWebSearch(prev => !prev);
+  }, []);
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Sidebar */}
       <div className={`sidebar ${sidebarOpen ? 'open' : ''} shadow-lg`}>
         <Sidebar 
           currentConversationId={conversationId}
-          onSelectConversation={(id) => {
-            setConversationId(id);
-            localStorage.setItem('currentConversationId', id);
-            setSidebarOpen(false); // Close sidebar on mobile after selection
-          }}
-          onNewChat={() => {
-            const newId = uuidv4();
-            createNewConversation(newId)
-              .then(() => {
-                setConversationId(newId);
-                localStorage.setItem('currentConversationId', newId);
-                setMessages([]);
-                setSidebarOpen(false); // Close sidebar on mobile after new chat
-              })
-              .catch(err => {
-                console.error('Error creating new conversation:', err);
-                setError('Failed to create new conversation');
-              });
-          }}
+          onSelectConversation={handleSelectConversation}
+          onNewChat={handleNewChat}
         />
       </div>
       
@@ -475,6 +525,12 @@ const Chat: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-3">
+              {/* Web search toggle */}
+              <SearchToggle 
+                enabled={useWebSearch}
+                onToggle={toggleWebSearch}
+              />
+              
               {/* Model selector */}
               <ModelSelector 
                 selectedModel={selectedModel} 
@@ -506,6 +562,11 @@ const Chat: React.FC = () => {
                     <strong>Please select a model</strong> to start chatting.
                   </div>
                 )}
+                {useWebSearch && (
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg mb-4 text-sm text-blue-600 dark:text-blue-400">
+                    <strong>Web search is enabled!</strong> Your AI can now search the web for information.
+                  </div>
+                )}
                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
                   Your conversations are stored locally and never leave your device.
                 </div>
@@ -517,14 +578,22 @@ const Chat: React.FC = () => {
                 <MessageItem 
                   key={index} 
                   message={message}
+                  isSearchEnabled={useWebSearch}
                 />
               ))}
               {isLoading && (
-                <div className="my-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse">
-                  <div className="flex items-center">
-                    <div className="h-4 w-4 mr-2 rounded-full bg-indigo-400 dark:bg-indigo-600"></div>
-                    <div className="h-4 flex-grow rounded bg-gray-300 dark:bg-gray-600"></div>
-                  </div>
+                <div className="my-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                  {searchStatus ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin h-4 w-4 mr-2 border-2 border-indigo-500 rounded-full border-t-transparent"></div>
+                      <div className="text-sm text-gray-700 dark:text-gray-300">{searchStatus}</div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center animate-pulse">
+                      <div className="h-4 w-4 mr-2 rounded-full bg-indigo-400 dark:bg-indigo-600"></div>
+                      <div className="h-4 flex-grow rounded bg-gray-300 dark:bg-gray-600"></div>
+                    </div>
+                  )}
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -543,8 +612,20 @@ const Chat: React.FC = () => {
             <ChatInput 
               onSendMessage={handleSendMessage} 
               disabled={isLoading || !selectedModel}
-              placeholder={selectedModel ? "Type your message..." : "Please select a model to start chatting"}
+              placeholder={
+                !selectedModel 
+                  ? "Please select a model to start chatting" 
+                  : useWebSearch 
+                    ? "Ask anything (web search enabled)..." 
+                    : "Type your message..."
+              }
+              showSearchInput={useWebSearch}
             />
+            {useWebSearch && !isLoading && (
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
+                Web search powered by DuckDuckGo
+              </div>
+            )}
           </div>
         </div>
       </div>

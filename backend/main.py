@@ -17,6 +17,13 @@ from sqlalchemy.orm import sessionmaker, Session
 # Import the cache
 from cache import cache
 
+# Import the free web search tool
+from web_search import DuckDuckGoSearchTool, WebFetchTool
+
+# Initialize web search tools - no API key needed
+web_search_tool = DuckDuckGoSearchTool()
+web_fetch_tool = WebFetchTool()
+
 # Database setup
 DATABASE_URL = "sqlite:///./chat_history.db"
 engine = create_engine(DATABASE_URL)
@@ -86,6 +93,19 @@ class MultimodalChatRequest(BaseModel):
     messages: List[MultimodalMessage]
     stream: bool = True
     conversation_id: Optional[str] = None
+
+# New Pydantic models for web search
+class WebSearchRequest(BaseModel):
+    query: str
+    num_results: int = 5
+
+class WebFetchRequest(BaseModel):
+    url: str
+
+# Enhanced chat model to support web search
+class EnhancedChatRequest(ChatRequest):
+    use_web_search: bool = False
+    web_search_query: Optional[str] = None
 
 # API endpoints
 @app.get("/api/models")
@@ -415,6 +435,283 @@ def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
     db.query(ChatHistory).filter(ChatHistory.conversation_id == conversation_id).delete()
     db.commit()
     return {"status": "success", "message": f"Conversation {conversation_id} deleted"}
+
+# New endpoints for web search
+@app.post("/api/web_search")
+async def web_search(request: WebSearchRequest):
+    """Perform a web search for the given query"""
+    try:
+        results = await web_search_tool.search(request.query, request.num_results)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error performing web search: {str(e)}")
+
+@app.post("/api/web_fetch")
+async def web_fetch(request: WebFetchRequest):
+    """Fetch content from a URL"""
+    try:
+        result = await web_fetch_tool.fetch(request.url)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching URL: {str(e)}")
+
+@app.post("/api/chat/enhanced")
+async def enhanced_chat(request: EnhancedChatRequest):
+    """Chat endpoint with optional web search capability"""
+    try:
+        messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+        
+        # Check if web search is requested
+        if request.use_web_search and request.web_search_query:
+            # Perform web search
+            search_results = await web_search_tool.search(request.web_search_query)
+            
+            if search_results:
+                # Fetch the first result for more context
+                first_result = search_results[0]
+                fetched_content = await web_fetch_tool.fetch(first_result['url'])
+                
+                # Format search results for the LLM
+                search_context = "Web Search Results:\n\n"
+                for i, result in enumerate(search_results):
+                    search_context += f"[{i+1}] {result['title']}\n"
+                    search_context += f"URL: {result['url']}\n"
+                    search_context += f"Summary: {result['snippet']}\n\n"
+                
+                # Add content from first result
+                if 'main_content' in fetched_content and fetched_content['main_content']:
+                    content_extract = fetched_content['main_content']
+                    if len(content_extract) > 2000:
+                        content_extract = content_extract[:2000] + "...(content truncated)"
+                    
+                    search_context += f"\nExtracted content from {first_result['url']}:\n{content_extract}\n\n"
+                
+                # Add search results as a system message
+                messages.append({
+                    "role": "system",
+                    "content": f"The following information was retrieved from a web search for '{request.web_search_query}':\n\n{search_context}\nPlease use this information to help answer the user's question."
+                })
+        
+        # Prepare the request to Ollama
+        payload = {
+            "model": request.model,
+            "messages": messages,
+            "stream": request.stream
+        }
+        
+        # Make the request to Ollama
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{OLLAMA_API_URL}/chat", json=payload)
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Save to history if conversation_id is provided
+                if request.conversation_id:
+                    db = SessionLocal()
+                    # Save the last user message
+                    last_user_msg = next((msg for msg in reversed(request.messages) if msg.role == "user"), None)
+                    if last_user_msg:
+                        db_msg = ChatHistory(
+                            conversation_id=request.conversation_id,
+                            role="user",
+                            content=last_user_msg.content,
+                            timestamp=datetime.datetime.now().isoformat()
+                        )
+                        db.add(db_msg)
+                    
+                    # Save the assistant response
+                    db_response = ChatHistory(
+                        conversation_id=request.conversation_id,
+                        role="assistant",
+                        content=result["message"]["content"],
+                        timestamp=datetime.datetime.now().isoformat()
+                    )
+                    db.add(db_response)
+                    db.commit()
+                
+                return result
+            else:
+                raise HTTPException(status_code=response.status_code, detail="Failed to get response from Ollama")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+# Streaming version of enhanced chat
+async def enhanced_stream_response(model: str, messages: List[Dict], use_web_search: bool, web_search_query: Optional[str]):
+    """Stream response from Ollama with optional web search"""
+    try:
+        # Check if web search is requested
+        if use_web_search and web_search_query:
+            # Perform web search
+            search_results = await web_search_tool.search(web_search_query)
+            
+            if search_results:
+                # Fetch the first result for more context
+                first_result = search_results[0]
+                fetched_content = await web_fetch_tool.fetch(first_result['url'])
+                
+                # Format search results for the LLM
+                search_context = "Web Search Results:\n\n"
+                for i, result in enumerate(search_results):
+                    search_context += f"[{i+1}] {result['title']}\n"
+                    search_context += f"URL: {result['url']}\n"
+                    search_context += f"Summary: {result['snippet']}\n\n"
+                
+                # Add content from first result
+                if 'main_content' in fetched_content and fetched_content['main_content']:
+                    content_extract = fetched_content['main_content']
+                    if len(content_extract) > 2000:
+                        content_extract = content_extract[:2000] + "...(content truncated)"
+                    
+                    search_context += f"\nExtracted content from {first_result['url']}:\n{content_extract}\n\n"
+                
+                # Add search results as a system message
+                messages.append({
+                    "role": "system",
+                    "content": f"The following information was retrieved from a web search for '{web_search_query}':\n\n{search_context}\nPlease use this information to help answer the user's question."
+                })
+    except Exception as e:
+        yield f"data: {json.dumps({'error': f'Error in web search: {str(e)}'})}\n\n"
+    
+    # Prepare the request to Ollama
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True
+    }
+    
+    # Stream the response from Ollama
+    async with httpx.AsyncClient() as client:
+        async with client.stream("POST", f"{OLLAMA_API_URL}/chat", json=payload, timeout=60.0) as response:
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': 'Failed to connect to Ollama'})}\n\n"
+                return
+                
+            async for chunk in response.aiter_text():
+                if chunk.strip():
+                    yield f"data: {chunk}\n\n"
+
+@app.post("/api/chat/enhanced/stream")
+async def enhanced_stream_chat(request: EnhancedChatRequest):
+    """Streaming chat endpoint with optional web search capability"""
+    messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
+    
+    return StreamingResponse(
+        enhanced_stream_response(request.model, messages, request.use_web_search, request.web_search_query),
+        media_type="text/event-stream"
+    )
+
+@app.websocket("/api/ws/enhanced")
+async def enhanced_websocket_endpoint(websocket: WebSocket):
+    """Enhanced WebSocket endpoint with web search capabilities"""
+    await websocket.accept()
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            model = data.get("model", "llama2")
+            messages = data.get("messages", [])
+            conversation_id = data.get("conversation_id")
+            use_web_search = data.get("use_web_search", False)
+            web_search_query = data.get("web_search_query")
+            
+            # Save user message to history if conversation_id is provided
+            if conversation_id:
+                db = SessionLocal()
+                last_user_msg = next((msg for msg in reversed(messages) if msg["role"] == "user"), None)
+                if last_user_msg:
+                    db_msg = ChatHistory(
+                        conversation_id=conversation_id,
+                        role="user",
+                        content=last_user_msg["content"],
+                        timestamp=datetime.datetime.now().isoformat()
+                    )
+                    db.add(db_msg)
+                    db.commit()
+            
+            # Check if web search is requested
+            if use_web_search and web_search_query:
+                await websocket.send_json({"status": "searching", "message": f"Searching the web for: {web_search_query}"})
+                
+                try:
+                    # Perform web search
+                    search_results = await web_search_tool.search(web_search_query)
+                    
+                    if search_results:
+                        # Fetch the first result for more context
+                        first_result = search_results[0]
+                        fetched_content = await web_fetch_tool.fetch(first_result['url'])
+                        
+                        # Format search results for the LLM
+                        search_context = "Web Search Results:\n\n"
+                        for i, result in enumerate(search_results):
+                            search_context += f"[{i+1}] {result['title']}\n"
+                            search_context += f"URL: {result['url']}\n"
+                            search_context += f"Summary: {result['snippet']}\n\n"
+                        
+                        # Add content from first result
+                        if 'main_content' in fetched_content and fetched_content['main_content']:
+                            content_extract = fetched_content['main_content']
+                            if len(content_extract) > 2000:
+                                content_extract = content_extract[:2000] + "...(content truncated)"
+                            
+                            search_context += f"\nExtracted content from {first_result['url']}:\n{content_extract}\n\n"
+                        
+                        # Add search results as a system message
+                        messages.append({
+                            "role": "system",
+                            "content": f"The following information was retrieved from a web search for '{web_search_query}':\n\n{search_context}\nPlease use this information to help answer the user's question."
+                        })
+                        
+                        await websocket.send_json({"status": "search_complete", "results_count": len(search_results)})
+                    else:
+                        await websocket.send_json({"status": "search_complete", "results_count": 0, "message": "No search results found"})
+                except Exception as e:
+                    await websocket.send_json({"status": "search_error", "error": str(e)})
+            
+            # Prepare the request to Ollama
+            payload = {
+                "model": model,
+                "messages": messages,
+                "stream": True
+            }
+            
+            # Stream the response from Ollama
+            full_response = ""
+            await websocket.send_json({"status": "generating"})
+            
+            async with httpx.AsyncClient() as client:
+                async with client.stream("POST", f"{OLLAMA_API_URL}/chat", json=payload, timeout=60.0) as response:
+                    if response.status_code != 200:
+                        await websocket.send_json({"error": "Failed to connect to Ollama"})
+                        continue
+                        
+                    async for chunk in response.aiter_text():
+                        if chunk.strip():
+                            try:
+                                chunk_data = json.loads(chunk)
+                                if "message" in chunk_data and "content" in chunk_data["message"]:
+                                    content = chunk_data["message"]["content"]
+                                    full_response += content
+                                    await websocket.send_text(chunk)
+                            except json.JSONDecodeError:
+                                await websocket.send_text(chunk)
+            
+            # Save assistant response to history if conversation_id is provided
+            if conversation_id and full_response:
+                db = SessionLocal()
+                db_response = ChatHistory(
+                    conversation_id=conversation_id,
+                    role="assistant",
+                    content=full_response,
+                    timestamp=datetime.datetime.now().isoformat()
+                )
+                db.add(db_response)
+                db.commit()
+                
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        await websocket.send_json({"error": str(e)})
 
 if __name__ == "__main__":
     import uvicorn

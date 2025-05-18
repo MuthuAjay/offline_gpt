@@ -4,18 +4,46 @@ import ReactMarkdown from 'react-markdown';
 
 interface MessageItemProps {
   message: Message;
+  isSearchEnabled?: boolean;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled = false }) => {
   const isUser = message.role === 'user';
+  
+  // Function to highlight search results and citations
+  const highlightSearchContent = (content: string) => {
+    // Check if this looks like a message with search results
+    const hasSearchResults = 
+      !isUser && 
+      isSearchEnabled && 
+      (content.includes("Search results:") || 
+       content.includes("I found") || 
+       content.includes("According to") ||
+       content.match(/\[(\d+)\]:/g) || // Citation pattern [1]:
+       content.match(/\(https?:\/\/[^\s)]+\)/g)); // URL pattern
+       
+    if (!hasSearchResults) {
+      return content;
+    }
+    
+    // Add special styling for search content in the final rendered markdown
+    return content
+      // Add class to citation numbers [1], [2], etc.
+      .replace(/\[(\d+)\]/g, '[$1]{.search-citation}')
+      // Add class to URLs
+      .replace(/(https?:\/\/[^\s]+)/g, '[$1]{.search-url}')
+      // Add class to search result sections
+      .replace(/(Search results for:.*?)(?=\n\n|\n##|\n###|$)/gs, '$1{.search-results-section}')
+      .replace(/(According to .*?)(?=\n\n|\n##|\n###|$)/gs, '$1{.search-source-citation}');
+  };
 
   return (
     <div className={`message ${isUser ? 'message-user' : 'message-assistant'} mb-4`}>
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isUser 
-            ? 'bg-indigo-100 dark:bg-indigo-900' 
+          isUser
+            ? 'bg-indigo-100 dark:bg-indigo-900'
             : 'bg-gray-100 dark:bg-gray-800'
         }`}>
           {isUser ? (
@@ -28,14 +56,29 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
             </svg>
           )}
         </div>
-
+        
         {/* Message content */}
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium mb-1">
+          <div className="text-sm font-medium mb-1 flex items-center gap-2">
             {isUser ? 'You' : 'Assistant'}
+            
+            {!isUser && isSearchEnabled && (
+              <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                Web Search
+              </span>
+            )}
           </div>
-          <div className="prose dark:prose-invert max-w-none">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+          
+          <div className={`prose dark:prose-invert max-w-none ${
+            // Add special styling if this is a message with search results
+            (!isUser && isSearchEnabled) ? 'search-enhanced-content' : ''
+          }`}>
+            <ReactMarkdown>
+              {isSearchEnabled && !isUser 
+                ? highlightSearchContent(message.content) 
+                : message.content
+              }
+            </ReactMarkdown>
           </div>
         </div>
       </div>
@@ -43,4 +86,4 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   );
 };
 
-export default MessageItem; 
+export default MessageItem;

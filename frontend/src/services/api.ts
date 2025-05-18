@@ -7,7 +7,12 @@ import {
   ModelsResponse, 
   MultimodalChatRequest, 
   ImageUploadResponse,
-  ApiError
+  ApiError,
+  WebSearchRequest,
+  WebSearchResponse,
+  WebFetchRequest,
+  WebFetchResponse,
+  EnhancedChatRequest
 } from '../types';
 
 // Constants
@@ -139,6 +144,131 @@ class ApiService {
       this.removeCancelToken(requestId);
       throw error;
     }
+  }
+
+  /**
+   * Send an enhanced chat request with web search capability
+   */
+  async sendEnhancedChatRequest(request: EnhancedChatRequest): Promise<ChatResponse> {
+    const requestId = `enhanced-chat-${Date.now()}`;
+    const cancelToken = this.getCancelToken(requestId).token;
+    
+    try {
+      const response = await this.instance.post<ChatResponse>('/chat/enhanced', request, { 
+        cancelToken,
+        timeout: TIMEOUT * 2, // Double timeout for search requests
+      });
+      this.removeCancelToken(requestId);
+      return response.data;
+    } catch (error) {
+      this.removeCancelToken(requestId);
+      throw error;
+    }
+  }
+
+  /**
+   * Perform a web search
+   */
+  async webSearch(request: WebSearchRequest): Promise<WebSearchResponse> {
+    const requestId = `web-search-${Date.now()}`;
+    const cancelToken = this.getCancelToken(requestId).token;
+    
+    try {
+      const response = await this.instance.post<WebSearchResponse>('/web_search', request, { cancelToken });
+      this.removeCancelToken(requestId);
+      return response.data;
+    } catch (error) {
+      this.removeCancelToken(requestId);
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch web content from a URL
+   */
+  async webFetch(request: WebFetchRequest): Promise<WebFetchResponse> {
+    const requestId = `web-fetch-${Date.now()}`;
+    const cancelToken = this.getCancelToken(requestId).token;
+    
+    try {
+      const response = await this.instance.post<WebFetchResponse>('/web_fetch', request, { 
+        cancelToken,
+        timeout: TIMEOUT * 1.5, // Increase timeout for web fetching
+      });
+      this.removeCancelToken(requestId);
+      return response.data;
+    } catch (error) {
+      this.removeCancelToken(requestId);
+      throw error;
+    }
+  }
+
+  /**
+   * Create an EventSource for enhanced chat streaming with web search
+   */
+  createEnhancedEventSource(request: EnhancedChatRequest): EventSource {
+    // Convert request to URL params for GET request
+    const params = new URLSearchParams();
+    params.append('model', request.model);
+    params.append('use_web_search', request.use_web_search.toString());
+    if (request.web_search_query) {
+      params.append('web_search_query', request.web_search_query);
+    }
+    if (request.conversation_id) {
+      params.append('conversation_id', request.conversation_id);
+    }
+    
+    const eventSource = new EventSource(`${API_URL}/chat/enhanced/stream?${params.toString()}`);
+    
+    // Add default error handler
+    eventSource.onerror = (error) => {
+      console.error('EventSource error:', error);
+      eventSource.close();
+    };
+    
+    return eventSource;
+  }
+
+  /**
+   * Create an Enhanced WebSocket connection for web search
+   */
+  createEnhancedWebSocketConnection(): WebSocket {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/api/ws/enhanced`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    // Add connection event handlers
+    ws.addEventListener('open', () => {
+      console.log('Enhanced WebSocket connection opened');
+    });
+    
+    ws.addEventListener('error', (error) => {
+      console.error('Enhanced WebSocket connection error:', error);
+    });
+    
+    ws.addEventListener('close', (event) => {
+      console.log('Enhanced WebSocket connection closed:', event.code, event.reason);
+    });
+    
+    // Set a timeout to handle connection issues
+    const connectionTimeout = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        console.error('WebSocket connection timeout');
+        // Force close the connection if it's still connecting
+        if (ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      }
+    }, WEBSOCKET_TIMEOUT);
+    
+    // Clear the timeout when the connection is established
+    ws.addEventListener('open', () => {
+      clearTimeout(connectionTimeout);
+    });
+    
+    return ws;
   }
 
   /**
@@ -345,3 +475,10 @@ export const createWebSocketConnection = (): WebSocket => apiService.createWebSo
 export const createNewConversation = (): Promise<{conversation_id: string}> => apiService.createNewConversation();
 export const uploadImage = (file: File): Promise<ImageUploadResponse> => apiService.uploadImage(file);
 export const sendMultimodalChatRequest = (request: MultimodalChatRequest): Promise<ChatResponse> => apiService.sendMultimodalChatRequest(request);
+
+// Export the new web search functionality
+export const webSearch = (request: WebSearchRequest): Promise<WebSearchResponse> => apiService.webSearch(request);
+export const webFetch = (request: WebFetchRequest): Promise<WebFetchResponse> => apiService.webFetch(request);
+export const sendEnhancedChatRequest = (request: EnhancedChatRequest): Promise<ChatResponse> => apiService.sendEnhancedChatRequest(request);
+export const createEnhancedEventSource = (request: EnhancedChatRequest): EventSource => apiService.createEnhancedEventSource(request);
+export const createEnhancedWebSocketConnection = (): WebSocket => apiService.createEnhancedWebSocketConnection();
