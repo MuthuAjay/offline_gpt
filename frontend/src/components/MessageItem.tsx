@@ -1,13 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Message } from '../types';
 import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { formatDate, copyToClipboard } from '../lib/utils';
+import { useToast } from '../hooks/use-toast';
+import { Button } from './ui/button';
+import { Copy, Check, Clock, User, Bot } from 'lucide-react';
 
 interface MessageItemProps {
   message: Message;
   isSearchEnabled?: boolean;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled = false }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled }) => {
+  const [isCopied, setIsCopied] = useState(false);
+  const { toast } = useToast();
   const isUser = message.role === 'user';
   
   // Function to highlight search results and citations
@@ -47,55 +56,159 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled = fa
      message.content.match(/\[(\d+)\]:/g) || 
      message.content.match(/\(https?:\/\/[^\s)]+\)/g));
 
+  const handleCopy = async () => {
+    try {
+      await copyToClipboard(message.content);
+      setIsCopied(true);
+      toast({
+        title: "Copied to clipboard",
+        description: "Message content has been copied to your clipboard.",
+        variant: "success",
+      });
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Could not copy message to clipboard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className={`message ${isUser ? 'message-user' : 'message-assistant'} mb-4`}>
-      <div className="flex items-start gap-3">
-        {/* Avatar */}
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-          isUser
-            ? 'bg-indigo-100 dark:bg-indigo-900'
-            : 'bg-gray-100 dark:bg-gray-800'
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.2 }}
+      className={`group relative flex gap-4 p-4 ${
+        isUser ? 'bg-muted/50' : 'bg-background'
+      }`}
+    >
+      {/* Avatar */}
+      <div className="flex-shrink-0">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+          isUser ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
         }`}>
-          {isUser ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          )}
-        </div>
-        
-        {/* Message content */}
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium mb-1 flex items-center gap-2">
-            {isUser ? 'You' : 'Assistant'}
-            
-            {!isUser && isSearchEnabled && isSearchResults && (
-              <span className="web-search-indicator">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                Web Search
-              </span>
-            )}
-          </div>
-          
-          <div className={`prose dark:prose-invert max-w-none ${
-            // Add special styling if this is a message with search results
-            (isSearchResults) ? 'search-enhanced-content' : ''
-          }`}>
-            <ReactMarkdown>
-              {isSearchEnabled && !isUser 
-                ? highlightSearchContent(message.content) 
-                : message.content
-              }
-            </ReactMarkdown>
-          </div>
+          {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
         </div>
       </div>
-    </div>
+
+      {/* Message content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-medium text-sm">
+            {isUser ? 'You' : 'Assistant'}
+          </span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatDate(new Date())}
+          </span>
+        </div>
+
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown
+            components={{
+              code({ node, inline, className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || '');
+                return !inline && match ? (
+                  <div className="relative group/code">
+                    <SyntaxHighlighter
+                      style={vscDarkPlus}
+                      language={match[1]}
+                      PreTag="div"
+                      className="rounded-lg !mt-0 !mb-0"
+                      {...props}
+                    >
+                      {String(children).replace(/\n$/, '')}
+                    </SyntaxHighlighter>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 opacity-0 group-hover/code:opacity-100 transition-opacity"
+                      onClick={() => {
+                        copyToClipboard(String(children))
+                          .then(() => {
+                            toast({
+                              title: "Code copied",
+                              description: "Code block has been copied to clipboard.",
+                              variant: "success",
+                            });
+                          })
+                          .catch(() => {
+                            toast({
+                              title: "Failed to copy code",
+                              description: "Could not copy code to clipboard.",
+                              variant: "destructive",
+                            });
+                          });
+                      }}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
+              },
+              p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc pl-4 mb-4 last:mb-0">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal pl-4 mb-4 last:mb-0">{children}</ol>,
+              li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
+              a: ({ href, children }) => (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {children}
+                </a>
+              ),
+            }}
+          >
+            {isSearchEnabled && !isUser 
+              ? highlightSearchContent(message.content) 
+              : message.content
+            }
+          </ReactMarkdown>
+        </div>
+      </div>
+
+      {/* Copy button */}
+      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleCopy}
+          className="h-8 w-8"
+        >
+          <AnimatePresence mode="wait">
+            {isCopied ? (
+              <motion.div
+                key="check"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+              >
+                <Check className="w-4 h-4 text-green-500" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="copy"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+              >
+                <Copy className="w-4 h-4" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Button>
+      </div>
+    </motion.div>
   );
 };
 

@@ -14,6 +14,8 @@ import {
   webSearch
 } from '../services/api';
 import Sidebar from './Sidebar';
+import { Button } from './ui/button';
+import { Search } from 'lucide-react';
 
 const LOADING_TIMEOUT = 30000; // 30 seconds timeout
 
@@ -31,7 +33,8 @@ const Chat: React.FC = () => {
   
   // Web search related state
   const [useWebSearch, setUseWebSearch] = useState(() => {
-    return localStorage.getItem('useWebSearch') === 'true';
+    const saved = localStorage.getItem('useWebSearch');
+    return saved === 'true';
   });
   const [searchStatus, setSearchStatus] = useState<string>('');
   
@@ -480,59 +483,60 @@ const Chat: React.FC = () => {
 
   // Toggle web search feature
   const toggleWebSearch = useCallback(() => {
-    setUseWebSearch(prev => !prev);
-  }, []);
+    try {
+      // Close existing WebSocket connection
+      if (ws.current) {
+        ws.current.close();
+      }
+      
+      // Toggle web search state
+      const newState = !useWebSearch;
+      setUseWebSearch(newState);
+      
+      // Update localStorage
+      localStorage.setItem('useWebSearch', newState.toString());
+      
+      // Reconnect WebSocket with new settings
+      setTimeout(() => {
+        ws.current = initializeWebSocket();
+      }, 100);
+    } catch (error) {
+      console.error('Error toggling web search:', error);
+      setError('Failed to toggle web search. Please try again.');
+    }
+  }, [useWebSearch, initializeWebSocket]);
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       {/* Sidebar */}
-      <div className={`sidebar ${sidebarOpen ? 'open' : ''} shadow-lg`}>
-        <Sidebar 
-          currentConversationId={conversationId}
-          onSelectConversation={handleSelectConversation}
-          onNewChat={handleNewChat}
-        />
-      </div>
-      
-      {/* Sidebar overlay (mobile) */}
-      <div 
-        className={`sidebar-overlay ${sidebarOpen ? 'visible' : ''}`}
-        onClick={() => setSidebarOpen(false)}
-      ></div>
-      
-      {/* Main content area */}
-      <div className="flex flex-col flex-grow overflow-hidden">
-        {/* Header with model selector and burger menu */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm z-10">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center">
-              {/* Hamburger menu for mobile */}
-              <button 
-                className="mr-3 md:hidden text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                aria-label="Toggle sidebar"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              
-              {/* Logo or brand name */}
-              <h1 className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">
-                OfflineGPT
-              </h1>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Model selector */}
-              <ModelSelector 
-                selectedModel={selectedModel} 
-                onModelChange={setSelectedModel}
-              />
-              
-              {/* Theme toggle */}
-              <ThemeToggle />
-            </div>
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={handleNewChat}
+        onSelectConversation={handleSelectConversation}
+        currentConversationId={conversationId}
+      />
+
+      {/* Main chat area */}
+      <div className="flex-1 flex flex-col h-full">
+        {/* Header */}
+        <header className="flex items-center justify-between p-4 border-b bg-card">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="md:hidden p-2 hover:bg-muted rounded-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <ModelSelector
+              selectedModel={selectedModel}
+              onModelSelect={setSelectedModel}
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
           </div>
         </header>
         
@@ -615,6 +619,7 @@ const Chat: React.FC = () => {
               showSearchInput={useWebSearch}
               webSearchEnabled={useWebSearch}
               onToggleWebSearch={toggleWebSearch}
+              isLoading={isLoading}
             />
             {useWebSearch && !isLoading && (
               <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">

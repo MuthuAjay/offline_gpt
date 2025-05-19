@@ -1,5 +1,10 @@
-import React, { useState, KeyboardEvent, useRef } from 'react';
+import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from './ui/button';
+import { useToast } from '../hooks/use-toast';
+import { Send, Image as ImageIcon, Search, X, Loader2 } from 'lucide-react';
 import ImageUploader from './ImageUploader';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 interface ChatInputProps {
   onSendMessage: (message: string, imageBase64?: string, customSearchQuery?: string) => void;
@@ -8,6 +13,7 @@ interface ChatInputProps {
   showSearchInput?: boolean;
   webSearchEnabled?: boolean;
   onToggleWebSearch?: () => void;
+  isLoading?: boolean;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
@@ -16,20 +22,38 @@ const ChatInput: React.FC<ChatInputProps> = ({
   placeholder = "Type your message...",
   showSearchInput = false,
   webSearchEnabled = false,
-  onToggleWebSearch
+  onToggleWebSearch,
+  isLoading = false
 }) => {
   const [message, setMessage] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [customSearchQuery, setCustomSearchQuery] = useState('');
   const [showCustomSearch, setShowCustomSearch] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  }, [message]);
+
+  // Add effect to handle web search state changes
+  useEffect(() => {
+    if (webSearchEnabled && !showCustomSearch) {
+      setShowCustomSearch(false);
+    }
+  }, [webSearchEnabled]);
 
   const handleSendMessage = () => {
     if ((message.trim() || imageBase64) && !disabled) {
-      // Pass the custom search query if it's enabled and not empty
       const searchQuery = (showSearchInput && showCustomSearch && customSearchQuery.trim()) 
         ? customSearchQuery.trim() 
         : undefined;
@@ -38,8 +62,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
       setMessage('');
       setImageBase64(null);
       
-      // Don't clear the custom search query after sending
-      // so users can use the same search query for multiple messages
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     }
   };
   
@@ -52,171 +78,192 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleImageUploaded = (base64Data: string) => {
-    setImageBase64(base64Data);
+  const handleImageUploaded = async (base64Data: string) => {
+    try {
+      setIsUploading(true);
+      setImageBase64(base64Data);
+      toast({
+        title: "Image uploaded",
+        description: "Your image has been attached to the message.",
+        variant: "success",
+      });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: "Could not upload the image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const textarea = e.target;
-    setMessage(textarea.value);
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`;
+    setMessage(e.target.value);
   };
 
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCustomSearchQuery(e.target.value);
   };
 
-  const toggleCustomSearch = () => {
-    setShowCustomSearch(!showCustomSearch);
-    // Focus the search input when it becomes visible
-    if (!showCustomSearch) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 0);
-    } else {
-      // Focus back on the main textarea when hiding search
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 0);
-    }
-  };
-
   return (
-    <div className="flex flex-col w-full">
-      {/* Custom search input */}
-      {showSearchInput && showCustomSearch && (
-        <div className="web-search-input-container custom-search-input-container mb-2">
-          <div className="flex items-center px-3 py-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input 
-              type="text"
-              ref={searchInputRef}
-              className="web-search-input flex-grow"
-              placeholder="Custom search query (optional)"
-              value={customSearchQuery}
-              onChange={handleSearchInputChange}
-              disabled={disabled}
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Image preview */}
-      {imageBase64 && (
-        <div className="mb-2 relative">
-          <img
-            src={`data:image/jpeg;base64,${imageBase64}`}
-            alt="Uploaded"
-            className="h-20 rounded-md object-cover"
-          />
-          <button
-            type="button"
-            onClick={() => setImageBase64(null)}
-            className="absolute top-1 right-1 bg-gray-800 bg-opacity-50 rounded-full p-1 text-white hover:bg-opacity-70 transition-colors"
-            aria-label="Remove image"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
-      )}
-      
-      {/* Main input area */}
-      <div className="chat-input-container">
-        <textarea
-          ref={textareaRef}
-          className="chat-input"
-          placeholder={placeholder}
-          rows={1}
-          value={message}
-          onChange={handleTextareaChange}
-          onKeyDown={handleKeyDown}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => setIsComposing(false)}
-          disabled={disabled}
-          aria-label="Message input"
-        />
-        <div className="chat-input-actions">
-          {/* Web search toggle button */}
-          {onToggleWebSearch && (
-            <button
-              type="button"
-              onClick={onToggleWebSearch}
-              className={`chat-input-button web-search-toggle ${webSearchEnabled ? 'active' : ''}`}
-              title={webSearchEnabled ? "Disable web search" : "Enable web search"}
-              aria-label={webSearchEnabled ? "Web search enabled" : "Web search disabled"}
+    <div className="relative">
+      <TooltipProvider>
+        {/* Custom search input */}
+        <AnimatePresence>
+          {showSearchInput && showCustomSearch && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-2"
             >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-5 w-5" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={2} 
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+              <div className="relative">
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={customSearchQuery}
+                  onChange={handleSearchInputChange}
+                  placeholder="Enter custom search query..."
+                  className="w-full px-4 py-2 pr-10 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  disabled={disabled}
                 />
-              </svg>
-            </button>
+                <button
+                  onClick={() => setShowCustomSearch(false)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  disabled={disabled}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
           )}
-          
-          {/* Custom search query toggle - only visible when web search is enabled */}
-          {showSearchInput && webSearchEnabled && (
+        </AnimatePresence>
+
+        {/* Image preview */}
+        <AnimatePresence>
+          {imageBase64 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mb-2 relative"
+            >
+              <div className="relative inline-block">
+                <img
+                  src={`data:image/jpeg;base64,${imageBase64}`}
+                  alt="Uploaded"
+                  className="h-20 rounded-lg object-cover border"
+                />
+                <button
+                  type="button"
+                  onClick={() => setImageBase64(null)}
+                  className="absolute -top-2 -right-2 bg-background rounded-full p-1 shadow-lg border hover:bg-muted transition-colors"
+                  aria-label="Remove image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main input area */}
+        <div className="relative flex items-end gap-2">
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={message}
+              onChange={handleTextareaChange}
+              onKeyDown={handleKeyDown}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionEnd={() => setIsComposing(false)}
+              placeholder={placeholder}
+              disabled={disabled}
+              rows={1}
+              className="w-full px-4 py-3 pr-32 text-sm bg-background border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ minHeight: '44px', maxHeight: '200px' }}
+            />
+            <div className="absolute right-2 bottom-2 flex items-center gap-1">
+              {/* Web search toggle */}
+              {onToggleWebSearch && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant={webSearchEnabled ? "default" : "ghost"}
+                      size="icon"
+                      onClick={onToggleWebSearch}
+                      className={`h-8 w-8 transition-colors duration-200 ${
+                        webSearchEnabled 
+                          ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
+                          : "hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400"
+                      }`}
+                      disabled={disabled}
+                    >
+                      <Search className={`w-4 h-4 ${webSearchEnabled ? "animate-pulse" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs">
+                      {webSearchEnabled 
+                        ? "Web search is enabled. The AI will search the web for up-to-date information."
+                        : "Enable web search to allow the AI to search the web for current information."}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
+              {/* Image upload button */}
+              <ImageUploader
+                onImageUploaded={handleImageUploaded}
+                disabled={disabled || isUploading}
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={disabled || isUploading}
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ImageIcon className="w-4 h-4" />
+                  )}
+                </Button>
+              </ImageUploader>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleSendMessage}
+            disabled={disabled || (!message.trim() && !imageBase64)}
+            className="h-11 px-4"
+          >
+            <Send className="w-4 h-4 mr-2" />
+            Send
+          </Button>
+        </div>
+
+        {/* Web search status */}
+        {webSearchEnabled && !isLoading && (
+          <div className="mt-2 flex items-center justify-between">
             <button
-              type="button"
-              className={`chat-input-button ${showCustomSearch ? 'active' : ''}`}
-              onClick={toggleCustomSearch}
-              title={showCustomSearch ? "Hide search options" : "Show search options"}
+              onClick={() => setShowCustomSearch(!showCustomSearch)}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               disabled={disabled}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                {showCustomSearch ? (
-                  <path fillRule="evenodd" d="M4 8a1 1 0 011-1h2a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
-                ) : (
-                  <path fillRule="evenodd" d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z" clipRule="evenodd" />
-                )}
-              </svg>
+              <Search className="w-3 h-3" />
+              {showCustomSearch ? 'Hide custom search' : 'Add custom search'}
             </button>
-          )}
-          
-          {/* Image uploader */}
-          <ImageUploader onImageUploaded={handleImageUploaded} disabled={disabled} />
-          
-          {/* Send button */}
-          <button
-            type="button"
-            className="send-button"
-            onClick={handleSendMessage}
-            disabled={(!message.trim() && !imageBase64) || disabled}
-            aria-label="Send message"
-          >
-            Send
-          </button>
-        </div>
-      </div>
-      
-      {/* Web search indicator */}
-      {webSearchEnabled && !disabled && (
-        <div className="web-search-badge mt-2 ml-1">
-          <span className="dot"></span>
-          <span>Web search enabled</span>
-        </div>
-      )}
-      
-      {/* Status message */}
-      {disabled && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-2">
-          {message.trim() || imageBase64 ? "Processing your request..." : ""}
-        </p>
-      )}
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <Search className={`w-3 h-3 ${webSearchEnabled ? "animate-pulse" : ""}`} />
+              Web search enabled
+            </div>
+          </div>
+        )}
+      </TooltipProvider>
     </div>
   );
 };

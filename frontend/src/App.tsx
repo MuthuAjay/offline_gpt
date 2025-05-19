@@ -1,76 +1,53 @@
-import React, { useEffect, useState, Suspense, Component, ErrorInfo, ReactNode } from 'react';
-import './index.css';
+import React, { useEffect, useState, Suspense } from 'react';
+import { Toaster } from './components/ui/toaster';
+import './styles/globals.css';
 
 // Lazy load components for better performance
 const Chat = React.lazy(() => import('./components/Chat'));
 
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen bg-background">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <p className="text-lg text-muted-foreground">Loading chat interface...</p>
+    </div>
+  </div>
+);
+
 // Custom error boundary component
-interface ErrorBoundaryProps {
-  children: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class CustomErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null
-    };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return {
-      hasError: true,
-      error
-    };
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Application error:', error);
-    console.error('Error details:', errorInfo);
-  }
-
-  handleReset = () => {
-    this.setState({
-      hasError: false,
-      error: null
-    });
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
-              Something went wrong
-            </h2>
-            <div className="text-gray-700 dark:text-gray-300 mb-4 p-3 bg-red-50 dark:bg-gray-700 rounded border border-red-100 dark:border-gray-600">
-              <p className="mb-2 font-medium">Error details:</p>
-              <pre className="text-sm overflow-auto">{this.state.error?.message}</pre>
-            </div>
-            <p className="mb-4 text-gray-600 dark:text-gray-400">
-              Please try refreshing the page or check if Ollama is running properly.
+        <div className="flex items-center justify-center min-h-screen bg-background p-4">
+          <div className="max-w-md w-full p-6 rounded-lg border bg-card text-card-foreground shadow-lg">
+            <h2 className="text-2xl font-semibold mb-4 text-destructive">Something went wrong</h2>
+            <p className="text-muted-foreground mb-4">
+              {this.state.error?.message || 'An unexpected error occurred'}
             </p>
-            <div className="flex space-x-3">
-              <button
-                onClick={this.handleReset}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              >
-                Try again
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                Refresh page
-              </button>
-            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+            >
+              Reload page
+            </button>
           </div>
         </div>
       );
@@ -79,16 +56,6 @@ class CustomErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySta
     return this.props.children;
   }
 }
-
-// Loading component
-const LoadingFallback = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-    <div className="text-center">
-      <div className="inline-block animate-spin h-8 w-8 border-4 border-blue-500 rounded-full border-t-transparent mb-4"></div>
-      <p className="text-gray-700 dark:text-gray-300">Loading application...</p>
-    </div>
-  </div>
-);
 
 function App() {
   const [theme, setTheme] = useState('');
@@ -145,12 +112,13 @@ function App() {
   }, []);
 
   return (
-    <div className="App min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
-      <CustomErrorBoundary>
+    <div className="min-h-screen bg-background text-foreground antialiased">
+      <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <Chat />
         </Suspense>
-      </CustomErrorBoundary>
+      </ErrorBoundary>
+      <Toaster />
     </div>
   );
 }
