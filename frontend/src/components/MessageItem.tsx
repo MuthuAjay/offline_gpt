@@ -81,9 +81,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSearchEnabled }) =
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.2 }}
-      className={`group relative flex gap-4 p-4 ${
-        isUser ? 'bg-muted/50' : 'bg-background'
-      }`}
+      className={`group relative flex gap-4 p-4 my-2 max-w-2xl
+        ${isUser ? 'justify-end ml-auto' : 'justify-start mr-auto'}
+        rounded-2xl shadow-lg border
+        backdrop-blur-sm
+        bg-white/80 dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-800
+      `}
     >
       {/* Avatar */}
       <div className="flex-shrink-0">
