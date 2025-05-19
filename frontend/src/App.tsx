@@ -112,7 +112,8 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground antialiased">
+    <div className="cosmic-bg min-h-screen w-full">
+      <div className="glow-text">YOUR ONLY LIMIT IS YOU</div>
       <ErrorBoundary>
         <Suspense fallback={<LoadingFallback />}>
           <Chat />

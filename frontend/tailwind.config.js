@@ -52,6 +52,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        'cosmic-purple': '#7b2ff2',
+        'cosmic-pink': '#f357a8',
+        'cosmic-orange': '#ffb86c',
+        'cosmic-dark': '#1a1333',
+        'cosmic-light': '#f8e1ff',
       },
       borderRadius: {
         lg: "var(--radius)",

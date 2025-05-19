@@ -15,7 +15,8 @@ import {
 } from '../services/api';
 import Sidebar from './Sidebar';
 import { Button } from './ui/button';
-import { Search } from 'lucide-react';
+import { Search, Image as ImageIcon } from 'lucide-react';
+import WallpaperPicker from './WallpaperPicker';
 
 const LOADING_TIMEOUT = 30000; // 30 seconds timeout
 
@@ -43,6 +44,10 @@ const Chat: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const loadingTimeoutRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [wallpaper, setWallpaper] = useState<string | null>(() => {
+    return localStorage.getItem('chatWallpaper') || null;
+  });
+  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
 
   // Initialize WebSocket connection handler
   const initializeWebSocket = useCallback(() => {
@@ -506,8 +511,18 @@ const Chat: React.FC = () => {
     }
   }, [useWebSearch, initializeWebSocket]);
 
+  // Handler for wallpaper change
+  const handleWallpaperChange = (img: string | null) => {
+    setWallpaper(img);
+    if (img) {
+      localStorage.setItem('chatWallpaper', img);
+    } else {
+      localStorage.removeItem('chatWallpaper');
+    }
+  };
+
   return (
-    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 relative">
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -518,9 +533,23 @@ const Chat: React.FC = () => {
       />
 
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col h-full">
+      <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+        {/* Wallpaper background */}
+        {wallpaper && (
+          <>
+            <div className="absolute inset-0 z-0">
+              <img
+                src={wallpaper}
+                alt="Chat wallpaper"
+                className="w-full h-full object-cover object-center"
+                style={{ filter: 'brightness(0.5) blur(0px)' }}
+              />
+              <div className="absolute inset-0 bg-black/40" />
+            </div>
+          </>
+        )}
         {/* Header */}
-        <header className="flex items-center justify-between p-4 border-b bg-card">
+        <header className="flex items-center justify-between p-4 border-b bg-card relative z-10">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -536,12 +565,28 @@ const Chat: React.FC = () => {
             />
           </div>
           <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowWallpaperPicker(true)}
+              title="Set chat wallpaper"
+              className="hover:bg-cosmic-pink/20"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </Button>
             <ThemeToggle />
           </div>
         </header>
-        
+        {/* Wallpaper Picker Modal */}
+        {showWallpaperPicker && (
+          <WallpaperPicker
+            currentWallpaper={wallpaper}
+            onChange={handleWallpaperChange}
+            onClose={() => setShowWallpaperPicker(false)}
+          />
+        )}
         {/* Chat messages area */}
-        <div className="flex-grow overflow-y-auto px-4 md:px-8 py-4 bg-white dark:bg-gray-900">
+        <div className="flex-grow overflow-y-auto px-4 md:px-8 py-4 bg-white dark:bg-gray-900 relative z-10" style={wallpaper ? { background: 'transparent' } : {}}>
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center">
               <div className="max-w-md p-6 rounded-xl bg-white dark:bg-gray-800 shadow-md">
